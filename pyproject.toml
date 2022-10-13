@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "shiki-organizer"
+version = "0.1.0"
+description = "To-do list cli program"
+authors = ["Niko Honu <nikohonu@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "shiki_organizer"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
