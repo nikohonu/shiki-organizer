@@ -9,7 +9,11 @@ packages = [{include = "shiki_organizer"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+appdirs = "^1.4.4"
+termcolor = "^2.0.1"
 
+[tool.poetry.scripts]
+so = "shiki_organizer.__main__:main"
 
 [build-system]
 requires = ["poetry-core"]
