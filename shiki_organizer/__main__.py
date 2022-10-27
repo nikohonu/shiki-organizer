@@ -6,167 +6,115 @@ from pathlib import Path
 import appdirs
 from termcolor import colored
 
-from shiki_organizer.tasks import Tasks
-
-
-def run_list_command(
-    args: argparse.Namespace, parser: argparse.ArgumentParser, tasks: Tasks
-):
-    sorted_task = sorted(
-        tasks.all().items(),
-        key=lambda x: x[1].scheduled if x[1].scheduled != None else date.max,
-    )
-    for identifier, task in sorted_task:
-        if vars(args).get("today") and args.today and task.scheduled != date.today():
-            continue
-        if task.is_completed:
-            continue 
-        scheduled = (
-            colored(f" scheduled:", "red") + f"{task.scheduled}"
-            if task.scheduled
-            else ""
-        )
-        deadline = (
-            colored(f" deadline:", "green") + f"{task.deadline}"
-            if task.deadline
-            else ""
-        )
-        recurrence = (
-            colored(f" recurrence:", "yellow") + f"{task.recurrence}{task.unit}"
-            if task.recurrence
-            else ""
-        )
-        completions = colored(f" completions:", "blue") + f"{len(task.completions)}"
-        print(f"{identifier}. {task.description}{scheduled}{deadline}{recurrence}{completions}")
-
-
-def run_add_command(
-    args: argparse.Namespace, parser: argparse.ArgumentParser, tasks: Tasks
-):
-    if args.recurrence and not args.unit:
-        args.unit = "d"
-    elif args.unit and not args.recurrence:
-        parser.error("argument -u/--unit requires -r/--recurrence")
-    scheduled = None
-    deadline = None
-    if args.scheduled:
-        if args.scheduled == "today":
-            scheduled = dt.date.today()
-        else:
-            try:
-                scheduled: dt.date = dt.datetime.strptime(
-                    args.scheduled, "%Y-%m-%d"
-                ).date()
-            except ValueError:
-                parser.error(
-                    "the format of the schedule is incorrect. Try this: YYYY-MM-DD"
-                )
-    if args.deadline:
-        if args.deadline == "today":
-            deadline = dt.date.today()
-        else:
-            try:
-                deadline: dt.date = dt.datetime.strptime(
-                    args.deadline, "%Y-%m-%d"
-                ).date()
-            except ValueError:
-                parser.error(
-                    "the format of the deadline is incorrect. Try this: YYYY-MM-DD"
-                )
-    if deadline and scheduled and deadline < scheduled:
-        parser.error("the deadline cannot be earlier than scheduled")
-    tasks.add(
-        args.description,
-        scheduled,
-        deadline,
-        args.recurrence,
-        args.unit,
-    )
-
-
-def run_del_command(
-    args: argparse.Namespace, parser: argparse.ArgumentParser, tasks: Tasks
-):
-    try:
-        tasks.delete(args.id)
-    except ValueError:
-        parser.error("the task with this id does not exist")
-
-def run_do_command(
-    args: argparse.Namespace, parser: argparse.ArgumentParser, tasks: Tasks
-):
-    try:
-        tasks.do(args.id)
-    except ValueError:
-        parser.error("the task with this id does not exist")
-
-
-def run_edit_command(
-    args: argparse.Namespace, parser: argparse.ArgumentParser, tasks: Tasks
-):
-    print(args)
+from shiki_organizer.commands.overview_command import run_overview_command
+from shiki_organizer.commands.add_command import (
+    add_category_subparsers,
+    add_field_subparsers,
+    add_subparsers,
+    run_add_category_command,
+    run_add_command,
+    run_add_field_command,
+)
+from shiki_organizer.commands.del_command import (
+    del_category_subparsers,
+    del_field_subparsers,
+    del_subparsers,
+    run_del_category_command,
+    run_del_command,
+    run_del_field_command,
+)
+from shiki_organizer.commands.do_command import do_subparsers, run_do_command
+from shiki_organizer.commands.start_command import start_subparsers, run_start_command
+from shiki_organizer.commands.stop_command import stop_subparsers, run_stop_command
+from shiki_organizer.commands.edit_command import (
+    edit_subparsers,
+    run_edit_command,
+    run_edit_field_command,
+    run_edit_category_command,
+    edit_field_subparsers,
+    edit_category_subparsers,
+)
+from shiki_organizer.commands.list_command import (
+    list_subparsers,
+    run_list_command,
+    tree_subparsers,
+    run_tree_command,
+)
+from shiki_organizer.model import Task, Interval
 
 
 def main():
+    # processing
+    for task in Task.select():
+        if not task.is_completed and task.scheduled and task.scheduled < date.today():
+            task.scheduled = date.today()
+            task.save()
+    interval = Interval.get_or_none(Interval.end == None)
+    if interval:
+        while interval.start.date() != dt.date.today():
+            interval.end = dt.datetime.combine(interval.start.date(), dt.time.max)
+            interval.save()
+            next_day_datetime = dt.datetime.combine(
+                interval.start.date() + dt.timedelta(days=1), dt.time.min
+            )
+            interval = Interval.create(task=interval.task, start=next_day_datetime)
+        interval.save()
+    # start
     parser = argparse.ArgumentParser(description="To-do list.")
     subparsers = parser.add_subparsers(help="sub-command help", dest="command")
-    parser_list = subparsers.add_parser("list", help="show tasks")
-    parser_list.add_argument(
-        "-t",
-        "--today",
-        action="store_true",
-        help="show today task",
-    )
-    parser_add = subparsers.add_parser("add", help="add a task")
-    parser_add.add_argument(
-        "description", help="description of the task, aka name of the task"
-    )
-    parser_add.add_argument(
-        "-s",
-        "--scheduled",
-        help="the date when you plan to start working on that task. Example: 2022-10-13",
-    )
-    parser_add.add_argument(
-        "-d",
-        "--deadline",
-        help="the date when you plan to finish working on that task. Example: 2022-10-23",
-    )
-    parser_add.add_argument(
-        "-r",
-        "--recurrence",
-        help="set the recurrence interval (the default unit is day, to change it use -u/--unit)",
-        type=int,
-    )
-    parser_add.add_argument(
-        "-u",
-        "--unit",
-        help="set the recurrence unit: d(day), w(week), m(month), y(year)",
-        choices=["d", "w", "m", "y"],
-    )
-    parser_del = subparsers.add_parser("del", help="delete the task")
-    parser_del.add_argument("id", help="the task id", type=int)
-    parser_do = subparsers.add_parser("do", help="complete the task")
-    parser_do.add_argument("id", help="the task id", type=int)
-    parser_edit = subparsers.add_parser("edit", help="edit the task")
+    # task
+    add_subparsers(subparsers)
+    del_subparsers(subparsers)
+    do_subparsers(subparsers)
+    edit_subparsers(subparsers)
+    list_subparsers(subparsers)
+    tree_subparsers(subparsers)
+    start_subparsers(subparsers)
+    stop_subparsers(subparsers)
+    # field
+    del_field_subparsers(subparsers)
+    add_field_subparsers(subparsers)
+    edit_field_subparsers(subparsers)
+    # category
+    add_category_subparsers(subparsers)
+    del_category_subparsers(subparsers)
+    edit_category_subparsers(subparsers)
     args = parser.parse_args()
     data_path = Path(appdirs.user_data_dir("shiki-organizer", "Niko Honu"))
     tasks_path = data_path / "tasks"
     if not tasks_path.exists():
         tasks_path.mkdir(parents=True)
-    tasks = Tasks(tasks_path)
     match args.command:
-        case "list":
-            run_list_command(args, parser, tasks)
+        case "add-category":
+            run_add_category_command(args, parser)
         case "add":
-            run_add_command(args, parser, tasks)
+            run_add_command(args, parser)
+        case "add-field":
+            run_add_field_command(args, parser)
+        case "del-category":
+            run_del_category_command(args, parser)
         case "del":
-            run_del_command(args, parser, tasks)
+            run_del_command(args, parser)
+        case "del-field":
+            run_del_field_command(args, parser)
         case "do":
-            run_do_command(args, parser, tasks)
+            run_do_command(args, parser)
+        case "list":
+            run_list_command(args, parser)
+        case "tree":
+            run_tree_command(args, parser)
         case "edit":
-            run_edit_command(args)
+            run_edit_command(args, parser)
+        case "edit-field":
+            run_edit_field_command(args, parser)
+        case "edit-category":
+            run_edit_category_command(args, parser)
+        case "start":
+            run_start_command(args, parser)
+        case "stop":
+            run_stop_command()
         case _:
-            run_list_command(args, parser, tasks)
+            run_overview_command(args, parser)
 
 
 if __name__ == "__main__":
