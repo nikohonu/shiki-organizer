@@ -52,7 +52,7 @@ def run_list_command(args: argparse.Namespace, parser: argparse.ArgumentParser):
             else ""
         )
         recurrence = (
-            colored(f" recurrence:", "yellow") + f"{task.recurrence}{task.unit}"
+            colored(f" recurrence:", "yellow") + f"{task.recurrence}d"
             if task.recurrence
             else ""
         )
@@ -78,13 +78,13 @@ def get_children(table, parent):
 
 
 def row_to_str(key, row):
-    id = f"{key}. " if key.isnumeric() else ""
     divider = f'({row["divider"]}) '
+    id = f"{key}." if key.isnumeric() else ""
     duration = colored(f" duration:", "green") + f"{round(row['duration']/60)}"
     days = colored(f" days:", "blue") + f"{row['days']}"
     avg = colored(f" avg:", "cyan") + f"{round(row['avg']/60)}"
     score = colored(f" score:", "yellow") + f"{round(row['score']/60)}"
-    return f'{id}{divider}{row["name"]}{duration}{days}{avg}{score}'
+    return f'{divider}{id}{row["name"]}{duration}{days}{avg}{score}'
 
 
 def get_divider(model, interval):
@@ -150,7 +150,7 @@ def run_tree_command(args: argparse.Namespace, parser: argparse.ArgumentParser):
                         category_parent_key = "f" + str(task.field.id)
                     table["f" + str(task.field.id) + "c" + str(category.id)] = {
                         "name": category.name,
-                        "divider": get_divider(field, args.interval),
+                        "divider": get_divider(category, args.interval),
                         "duration": 0,
                         "days": set(),
                         "avg": 0,

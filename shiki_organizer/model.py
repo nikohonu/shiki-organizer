@@ -16,9 +16,7 @@ from shiki_organizer.utilities import get_user_data_dir
 
 database_path = get_user_data_dir() / "database.db"
 database_path.parent.mkdir(parents=True, exist_ok=True)
-database = SqliteDatabase(
-    database_path, pragmas={"foreign_keys": 1}
-)
+database = SqliteDatabase(database_path, pragmas={"foreign_keys": 1})
 
 
 class BaseModel(Model):
@@ -33,7 +31,7 @@ class Category(BaseModel):
     quarter_divider = IntegerField(default=1)
     year_divider = IntegerField(default=1)
     name = TextField(unique=True)
-    category = ForeignKeyField('self', on_delete="CASCADE", null=True)
+    category = ForeignKeyField("self", on_delete="CASCADE", null=True)
 
 
 class Field(BaseModel):
@@ -76,7 +74,6 @@ class Task(BaseModel):
         return sum(durations)
 
 
-
 class Skill(BaseModel):
     name = TextField()
 
@@ -101,7 +98,6 @@ class Interval(BaseModel):
             return (self.end - self.start).total_seconds()
         else:
             return (dt.datetime.now() - self.start).total_seconds()
-
 
 
 models = BaseModel.__subclasses__()
