@@ -10,19 +10,18 @@ packages = [{include = "shiki_organizer"}]
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
 appdirs = "^1.4.4"
-termcolor = "^2.0.1"
 peewee = "^3.15.3"
 pyside6 = "^6.4.0.1"
+termcolor = "^2.1.0"
 
 [tool.poetry.scripts]
-so = "shiki_organizer.__main__:main"
+shiki-organizer = "shiki_organizer.__main__:main"
+so = "shiki_organizer.cli:main"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.10.0"
-python-lsp-server = "^1.6.0"
-python-lsp-black = "^1.2.1"
-pyls-isort = "^0.2.2"
 pyright = "^1.1.279"
+isort = "^5.10.1"
 
 [build-system]
 requires = ["poetry-core"]
