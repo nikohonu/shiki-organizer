@@ -11,6 +11,7 @@
 - Update start command.
 - Update stop command.
 - Update tree command.
+- Update del command.
 ### Removed
 - Category.
 - Field.

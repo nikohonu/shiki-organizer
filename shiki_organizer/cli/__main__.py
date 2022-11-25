@@ -101,7 +101,7 @@ def main():
         )
     # start
     start_parser: argparse.ArgumentParser = subparsers.add_parser(
-        "start", help="start the task"
+        "start", help="start tasks"
     )
     start_parser.add_argument(
         "ids",
@@ -114,8 +114,17 @@ def main():
     stop_parser: argparse.ArgumentParser = subparsers.add_parser(
         "stop", help="stop a task"
     )
+    # del
+    del_parser = subparsers.add_parser("del", help="delete tasks")
+    del_parser.add_argument(
+        "ids",
+        help="ids of tasks",
+        type=int,
+        nargs="+",
+        choices=task_ids,
+    )
     # done
-    done_parser = subparsers.add_parser("done", help="complete the task")
+    done_parser = subparsers.add_parser("done", help="complete tasks")
     done_parser.add_argument(
         "ids",
         help="ids of tasks",
@@ -172,6 +181,8 @@ def main():
                     IntervalTask.create(interval=interval, task=task)
             else:
                 print("You need to stop the previous task before starting a new one.")
+            names = " ".join([f'"{task.name}"' for task in root_tasks])
+            print(f"Start {names}")
         case "stop":
             interval = Interval.get_or_none(Interval.end == None)
             if interval:
@@ -247,9 +258,31 @@ def main():
                 queue += children
                 print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
 
+        case "del":
+            tasks = Task.select().where(Task.id << args.ids)
+            q = IntervalTask.delete().where(IntervalTask.task << tasks)
+            q.execute()
+            q = TaskTask.delete().where(TaskTask.child << tasks)
+            q.execute()
+            q = TaskTask.delete().where(TaskTask.parent << tasks)
+            q.execute()
+            interval_ids = set()
+            for interval in Interval.select():
+                if (
+                    IntervalTask.select()
+                    .where(IntervalTask.interval == interval)
+                    .count()
+                    == 0
+                ):
+                    interval_ids.add(interval.id)
+            q = Interval.delete().where(Interval.id << interval_ids)
+            q.execute()
+            q = Task.delete().where(Task.id << [task.id for task in tasks])
+            q.execute()
+
         case "done":
-            root_tasks = Task.select().where(Task.id << args.ids)
-            for task in root_tasks:
+            tasks = Task.select().where(Task.id << args.ids)
+            for task in tasks:
                 if task.recurrence:
                     task.scheduled = (
                         dt.datetime.now() + dt.timedelta(days=task.recurrence)
