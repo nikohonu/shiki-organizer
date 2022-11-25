@@ -4,49 +4,9 @@ import datetime as dt
 from peewee import Select
 from termcolor import colored
 
-# from shiki_organizer.commands.overview_command import run_overview_command
-# from shiki_organizer.commands.add_command import (
-#     add_category_subparsers,
-#     add_field_subparsers,
-#     add_subparsers,
-#     run_add_category_command,
-#     run_add_command,
-#     run_add_field_command,
-# )
-# from shiki_organizer.commands.del_command import (
-#     del_category_subparsers,
-#     del_field_subparsers,
-#     del_subparsers,
-#     run_del_category_command,
-#     run_del_command,
-#     run_del_field_command,
-# )
-# from shiki_organizer.commands.do_command import do_subparsers, run_do_command
-# from shiki_organizer.commands.start_command import start_subparsers, run_start_command
-# from shiki_organizer.commands.stop_command import stop_subparsers, run_stop_command
-# from shiki_organizer.commands.edit_command import (
-#     edit_subparsers,
-#     run_edit_command,
-#     run_edit_field_command,
-#     run_edit_category_command,
-#     edit_field_subparsers,
-#     edit_category_subparsers,
-# )
-# from shiki_organizer.commands.list_command import (
-#     list_subparsers,
-#     run_list_command,
-#     tree_subparsers,
-#     run_tree_command,
-# )
-# from shiki_organizer.model import Task, Interval
 from shiki_organizer.model import Interval, IntervalTask, Task, TaskTask
 
-# import datetime as dt
-# from datetime import date
-# from pathlib import Path
 
-# import appdirs
-# from termcolor import colored
 def str_to_date(date, name, parser):
     result = None
     if date:
@@ -63,6 +23,22 @@ def str_to_date(date, name, parser):
 
 
 def main():
+    # processing
+    for task in Task.select():
+        if not task.archived and task.scheduled and task.scheduled < dt.date.today():
+            task.scheduled = dt.date.today()
+            task.save()
+    interval = Interval.get_or_none(Interval.end == None)
+    if interval:
+        while interval.start.date() != dt.date.today():
+            interval.end = dt.datetime.combine(interval.start.date(), dt.time.max)
+            interval.save()
+            next_day_datetime = dt.datetime.combine(
+                interval.start.date() + dt.timedelta(days=1), dt.time.min
+            )
+            interval = Interval.create(task=interval.task, start=next_day_datetime)
+        interval.save()
+
     parser = argparse.ArgumentParser(description="To-do list.")
     subparsers = parser.add_subparsers(help="sub-command help", dest="command")
     task_ids = [t.id for t in Task.select()]
@@ -134,6 +110,13 @@ def main():
     )
     # tree
     tree_parser = subparsers.add_parser("tree", help="print tasks as tree")
+    tree_parser.add_argument(
+        "-t",
+        "--today",
+        help="show only today tasks",
+        action="store_true",
+    )
+
     # ...
     args = parser.parse_args()
     match args.command:
@@ -206,13 +189,29 @@ def main():
 
             def row_to_str(key, row):
                 divider = f'({row["task"].divider}) '
+                scheduled = row["task"].scheduled
+                scheduled = (
+                    colored(f" scheduled:", "magenta") + str(scheduled)
+                    if scheduled
+                    else ""
+                )
+                deadline = row["task"].deadline
+                deadline = (
+                    colored(f" deadline:", "red") + str(deadline) if deadline else ""
+                )
+                recurrence = row["task"].recurrence
+                recurrence = (
+                    colored(f" recurrence:", "yellow") + str(recurrence) + "d"
+                    if recurrence
+                    else ""
+                )
                 duration = (
                     colored(f" duration:", "green") + f"{round(row['duration']/60)}"
                 )
                 days = colored(f" days:", "blue") + f"{row['days']}"
                 avg = colored(f" avg:", "cyan") + f"{round(row['avg']/60)}"
                 score = colored(f" score:", "yellow") + f"{round(row['score']/60)}"
-                return f'{divider}{key} {row["task"].name}{duration}{days}{avg}{score}'
+                return f'{divider}{key} {row["task"].name}{scheduled}{recurrence}{deadline}{duration}{days}{avg}{score}'
 
             table = {}
             for task in Task.select().where(Task.archived == False):
@@ -248,9 +247,24 @@ def main():
                     table[key]["task"].divider
                 )
             table = dict(sorted(table.items(), key=lambda tag: tag[1]["score"]))
-            queue = [
-                (0, task_id) for task_id in table if table[task_id]["parents"] == 0
-            ]
+            if args.today:
+                table = dict(
+                    sorted(
+                        table.items(),
+                        key=lambda tag: tag[1]["task"].scheduled
+                        if tag[1]["task"].scheduled != None
+                        else dt.date.max,
+                    )
+                )
+                queue = [
+                    (0, task_id)
+                    for task_id in table
+                    if table[task_id]["task"].scheduled == dt.date.today()
+                ]
+            else:
+                queue = [
+                    (0, task_id) for task_id in table if table[task_id]["parents"] == 0
+                ]
             queue.reverse()
             while queue:
                 row = queue.pop()
@@ -326,72 +340,5 @@ def main():
             print("last", f"{need}-{have}={need-have}")
 
 
-#     # processing
-#     for task in Task.select():
-#         if not task.is_completed and task.scheduled and task.scheduled < date.today():
-#             task.scheduled = date.today()
-#             task.save()
-#     interval = Interval.get_or_none(Interval.end == None)
-#     if interval:
-#         while interval.start.date() != dt.date.today():
-#             interval.end = dt.datetime.combine(interval.start.date(), dt.time.max)
-#             interval.save()
-#             next_day_datetime = dt.datetime.combine(
-#                 interval.start.date() + dt.timedelta(days=1), dt.time.min
-#             )
-#             interval = Interval.create(task=interval.task, start=next_day_datetime)
-#         interval.save()
-#     # start
-#     # task
-#     add_subparsers(subparsers)
-#     del_subparsers(subparsers)
-#     do_subparsers(subparsers)
-#     edit_subparsers(subparsers)
-#     list_subparsers(subparsers)
-#     tree_subparsers(subparsers)
-#     start_subparsers(subparsers)
-#     stop_subparsers(subparsers)
-#     # field
-#     del_field_subparsers(subparsers)
-#     add_field_subparsers(subparsers)
-#     edit_field_subparsers(subparsers)
-#     # category
-#     add_category_subparsers(subparsers)
-#     del_category_subparsers(subparsers)
-#     edit_category_subparsers(subparsers)
-#     data_path = Path(appdirs.user_data_dir("shiki-organizer", "Niko Honu"))
-#     tasks_path = data_path / "tasks"
-#     if not tasks_path.exists():
-#         tasks_path.mkdir(parents=True)
-#         case "add":
-#             run_add_command(args, parser)
-#         case "add-field":
-#             run_add_field_command(args, parser)
-#         case "del-category":
-#             run_del_category_command(args, parser)
-#         case "del":
-#             run_del_command(args, parser)
-#         case "del-field":
-#             run_del_field_command(args, parser)
-#         case "do":
-#             run_do_command(args, parser)
-#         case "list":
-#             run_list_command(args, parser)
-#         case "tree":
-#             run_tree_command(args, parser)
-#         case "edit":
-#             run_edit_command(args, parser)
-#         case "edit-field":
-#             run_edit_field_command(args, parser)
-#         case "edit-category":
-#             run_edit_category_command(args, parser)
-#         case "start":
-#             run_start_command(args, parser)
-#         case "stop":
-#             run_stop_command()
-#         case _:
-#             run_overview_command(args, parser)
-
-
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
