@@ -12,6 +12,7 @@
 - Update stop command.
 - Update tree command.
 - Update del command.
+- Update review command.
 ### Removed
 - Category.
 - Field.
