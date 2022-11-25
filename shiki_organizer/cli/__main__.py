@@ -47,9 +47,10 @@ from shiki_organizer.model import Interval, IntervalTask, Task, TaskTask
 
 
 def main():
-    print("so")
     parser = argparse.ArgumentParser(description="To-do list.")
     subparsers = parser.add_subparsers(help="sub-command help", dest="command")
+    task_ids = [t.id for t in Task.select()]
+    # add
     add_parser = subparsers.add_parser("add", help="add task")
     add_parser.add_argument("name", help="name of the task")
     add_parser.add_argument(
@@ -67,8 +68,23 @@ def main():
         help="the date when you plan to finish working on that task. Example: 2022-10-23",
     )
     add_parser.add_argument(
-        "-t", "--tasks", nargs="+", help="ids of parent tasks", type=int, choices=[task.id for task in Task.select()]
+        "-t",
+        "--tasks",
+        nargs="+",
+        help="ids of parent tasks",
+        type=int,
+        choices=task_ids,
     )
+    # do
+    done_parser = subparsers.add_parser("done", help="complete the task")
+    done_parser.add_argument(
+        "ids",
+        help="ids of tasks",
+        type=int,
+        nargs="+",
+        choices=task_ids,
+    )
+    # ...
     args = parser.parse_args()
     match args.command:
         case "add":
@@ -108,6 +124,19 @@ def main():
                 for parent_id in args.tasks:
                     parent = Task.get_by_id(parent_id)
                     TaskTask.create(child=task, parent=parent)
+        case "done":
+            tasks = Task.select().where(Task.id << args.ids)
+            for task in tasks:
+                if task.recurrence:
+                    task.scheduled = (
+                        dt.datetime.now() + dt.timedelta(days=task.recurrence)
+                    ).date()
+                    if task.deadline and task.scheduled > task.deadline:
+                        task.archived = True
+                        task.scheduled = dt.datetime.now()
+                else:
+                    task.archived = True
+                task.save()
         case _:
             pass
 

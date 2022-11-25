@@ -6,6 +6,7 @@
 - Change folder structure.
 - Develop new database model.
 - Update add command.
+- Update done(do) command.
 ### Removed
 - Category.
 - Field.
