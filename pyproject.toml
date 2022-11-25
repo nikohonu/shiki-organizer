@@ -15,8 +15,8 @@ pyside6 = "^6.4.0.1"
 termcolor = "^2.1.0"
 
 [tool.poetry.scripts]
-shiki-organizer = "shiki_organizer.__main__:main"
-so = "shiki_organizer.cli:main"
+shiki-organizer = "shiki_organizer.gui.__main__:main"
+so = "shiki_organizer.cli.__main__:main"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.10.0"

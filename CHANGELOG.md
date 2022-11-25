@@ -2,4 +2,5 @@
 
 ## [Unreleased]
 ### Changed
-- Update dependencies
+- Update dependencies.
+- Change folder structure.
