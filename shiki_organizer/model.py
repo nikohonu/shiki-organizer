@@ -32,48 +32,36 @@ class Task(BaseModel):
     scheduled = DateField(null=True)
     deadline = DateField(null=True)
     archived = BooleanField(default=False)
+    parent = ForeignKeyField("self", on_delete="CASCADE", null=True)
 
     @property
     def parents(self):
-        result = set()
-        queue = set(
-            [tt.parent for tt in TaskTask.select().where(TaskTask.child == self)]
-        )
-        while queue:
-            task = queue.pop()
-            parents = [
-                tt.parent for tt in TaskTask.select().where(TaskTask.child == task)
-            ]
-            queue.update([t for t in parents if t not in result])
-            result.add(task)
+        result = []
+        q = self.parent
+        while q:
+            result.append(q)
+            q = q.parent
         return result
 
-    # @property
-    # def days(self):
-    #     dates = set()
-    #     for interval in Interval.select(Interval.start).where(Interval.task == self):
-    #         dates.add(interval.start.date())
-    #     return len(dates)
+    @property
+    def children(self):
+        result = []
+        queue = list(Task.select().where(Task.parent == self))
+        while queue:
+            task = queue.pop()
+            queue += list(Task.select().where(Task.parent == task))
+            result.append(task)
+        return result
 
-    # @property
-    # def duration(self):
-    #     durations = list()
-    #     for interval in Interval.select().where(Interval.task == self):
-    #         durations.append(interval.duration)
-    #     return sum(durations)
-
-
-class TaskTask(BaseModel):
-    child = ForeignKeyField(Task, on_delete="CASCADE")
-    parent = ForeignKeyField(Task, on_delete="CASCADE")
-
-    class Meta:
-        primary_key = CompositeKey("child", "parent")
+    @property
+    def direct_children(self):
+        return list(Task.select().where(Task.parent == self))
 
 
 class Interval(BaseModel):
     start = DateTimeField(default=dt.datetime.now)
     end = DateTimeField(null=True)
+    task = ForeignKeyField(Task, on_delete="CASCADE")
 
     @property
     def duration(self):
@@ -81,14 +69,6 @@ class Interval(BaseModel):
             return (self.end - self.start).total_seconds()
         else:
             return (dt.datetime.now() - self.start).total_seconds()
-
-
-class IntervalTask(BaseModel):
-    interval = ForeignKeyField(Interval, on_delete="CASCADE")
-    task = ForeignKeyField(Task, on_delete="CASCADE")
-
-    class Meta:
-        primary_key = CompositeKey("interval", "task")
 
 
 models = BaseModel.__subclasses__()

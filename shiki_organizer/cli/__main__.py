@@ -1,10 +1,11 @@
 import argparse
 import datetime as dt
+from functools import partial
 
 from peewee import Select
 from termcolor import colored
 
-from shiki_organizer.model import Interval, IntervalTask, Task, TaskTask
+from shiki_organizer.model import Interval, Task
 
 
 def str_to_date(date, name, parser):
@@ -68,10 +69,9 @@ def main():
             help="the date when you plan to finish working on that task. Example: 2022-10-23",
         )
         p.add_argument(
-            "-t",
-            "--tasks",
-            nargs="+",
-            help="ids of parent tasks",
+            "-p",
+            "--parent",
+            help="id of the parent task",
             type=int,
             choices=task_ids,
         )
@@ -80,10 +80,9 @@ def main():
         "start", help="start tasks"
     )
     start_parser.add_argument(
-        "ids",
-        help="ids of tasks",
+        "id",
+        help="id of the task",
         type=int,
-        nargs="+",
         choices=task_ids,
     )
     # stop
@@ -121,71 +120,38 @@ def main():
     args = parser.parse_args()
     match args.command:
         case "add":
-            scheduled = str_to_date(args.scheduled, "scheduled", parser)
-            deadline = str_to_date(args.deadline, "deadline", parser)
             task = Task.create(
                 name=args.name,
                 recurrence=args.recurrence,
-                scheduled=scheduled,
-                deadline=deadline,
+                scheduled=str_to_date(args.scheduled, "scheduled", parser),
+                deadline=str_to_date(args.deadline, "deadline", parser),
+                parent=Task.get_by_id(args.parent) if args.parent else None,
             )
-            if args.tasks:
-                for parent_id in args.tasks:
-                    parent = Task.get_by_id(parent_id)
-                    TaskTask.create(child=task, parent=parent)
         case "edit":
             scheduled = str_to_date(args.scheduled, "scheduled", parser)
             deadline = str_to_date(args.deadline, "deadline", parser)
+            parent = Task.get_by_id(args.parent) if args.parent else None
             task = Task.get_by_id(args.id)
             task.name = args.name if args.name else task.name
             task.recurrence = args.recurrence if args.recurrence else task.recurrence
             task.scheduled = scheduled if scheduled else task.scheduled
             task.deadline = deadline if deadline else task.deadline
+            task.parent = parent if parent else task.parent
             task.save()
-            if args.tasks:
-                q = TaskTask.delete().where(TaskTask.child == task)
-                q.execute()
-                if args.tasks:
-                    for parent_id in args.tasks:
-                        parent = Task.get_by_id(parent_id)
-                        TaskTask.create(child=task, parent=parent)
         case "start":
-            tasks = set()
-            root_tasks = Task.select().where(Task.id << args.ids)
-            for task in root_tasks:
-                tasks.add(task)
-                parents = task.parents
-                if parents:
-                    tasks.update(parents)
-            current_interval = Interval.get_or_none(Interval.end == None)
-            if not current_interval:
-                interval = Interval.create()
-                for task in tasks:
-                    IntervalTask.create(interval=interval, task=task)
+            interval = Interval.get_or_none(Interval.end == None)
+            task = Task.get_by_id(args.id)
+            if not interval:
+                Interval.create(task=task)
             else:
                 print("You need to stop the previous task before starting a new one.")
-            names = " ".join([f'"{task.name}"' for task in root_tasks])
-            print(f"Start {names}")
+            print(f"Start {task.name}")
         case "stop":
             interval = Interval.get_or_none(Interval.end == None)
             if interval:
                 interval.end = dt.datetime.now()
                 interval.save()
         case "tree":
-
-            def get_children(table, parent_id):
-                rows = []
-                children = [
-                    tt.child
-                    for tt in TaskTask.select(TaskTask.child).where(
-                        TaskTask.parent == table[parent_id]["task"]
-                    )
-                ]
-                for task_id in table:
-                    if table[task_id]["task"] in children:
-                        rows.append(task_id)
-                rows.reverse()
-                return rows
 
             def row_to_str(key, row):
                 divider = f'({row["task"].divider}) '
@@ -221,20 +187,11 @@ def main():
                     "days": set(),
                     "avg": 0,
                     "score": 0,
-                    "parents": TaskTask.select().where(TaskTask.child == task).count(),
                 }
             for interval in Interval.select():
                 duration = interval.duration
                 date = str(interval.start.date())
-                tasks = set(
-                    [
-                        it.task
-                        for it in IntervalTask.select().where(
-                            IntervalTask.interval == interval
-                        )
-                    ]
-                )
-                for task in tasks:
+                for task in interval.task.parents + [interval.task]:
                     table[task.id]["days"].add(date)
                     table[task.id]["duration"] += duration
             for key in table:
@@ -263,35 +220,24 @@ def main():
                 ]
             else:
                 queue = [
-                    (0, task_id) for task_id in table if table[task_id]["parents"] == 0
+                    (0, task_id)
+                    for task_id in table
+                    if table[task_id]["task"].parent == None
                 ]
             queue.reverse()
             while queue:
                 row = queue.pop()
-                children = [(row[0] + 1, t) for t in get_children(table, row[1])]
+                children = [
+                    (row[0] + 1, t.id) for t in table[row[1]]["task"].direct_children
+                ]
                 queue += children
                 print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
-
         case "del":
             tasks = Task.select().where(Task.id << args.ids)
-            q = IntervalTask.delete().where(IntervalTask.task << tasks)
-            q.execute()
-            q = TaskTask.delete().where(TaskTask.child << tasks)
-            q.execute()
-            q = TaskTask.delete().where(TaskTask.parent << tasks)
-            q.execute()
-            interval_ids = set()
-            for interval in Interval.select():
-                if (
-                    IntervalTask.select()
-                    .where(IntervalTask.interval == interval)
-                    .count()
-                    == 0
-                ):
-                    interval_ids.add(interval.id)
-            q = Interval.delete().where(Interval.id << interval_ids)
-            q.execute()
-            q = Task.delete().where(Task.id << [task.id for task in tasks])
+            for task in tasks:
+                q = Interval.delete().where(Interval.task == task)
+                q.execute()
+            q = Task.delete().where(Task.id << args.ids)
             q.execute()
 
         case "done":
