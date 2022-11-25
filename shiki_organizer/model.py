@@ -14,7 +14,7 @@ from peewee import (
 
 from shiki_organizer.utilities import get_user_data_dir
 
-database_path = get_user_data_dir() / "database.db"
+database_path = get_user_data_dir() / "data.db"
 database_path.parent.mkdir(parents=True, exist_ok=True)
 database = SqliteDatabase(database_path, pragmas={"foreign_keys": 1})
 
@@ -24,71 +24,39 @@ class BaseModel(Model):
         database = database
 
 
-class Category(BaseModel):
-    divider = IntegerField(default=1)
-    week_divider = IntegerField(default=1)
-    month_divider = IntegerField(default=1)
-    quarter_divider = IntegerField(default=1)
-    year_divider = IntegerField(default=1)
-    name = TextField(unique=True)
-    category = ForeignKeyField("self", on_delete="CASCADE", null=True)
-
-
-class Field(BaseModel):
-    divider = IntegerField(default=1)
-    week_divider = IntegerField(default=1)
-    month_divider = IntegerField(default=1)
-    quarter_divider = IntegerField(default=1)
-    year_divider = IntegerField(default=1)
-    name = TextField(unique=True)
-
-
 class Task(BaseModel):
-    field = ForeignKeyField(Field, on_delete="CASCADE", null=True)
-    category = ForeignKeyField(Category, on_delete="CASCADE", null=True)
-
+    rating = IntegerField(default=1000)
     divider = IntegerField(default=1)
-    week_divider = IntegerField(default=1)
-    month_divider = IntegerField(default=1)
-    quarter_divider = IntegerField(default=1)
-    year_divider = IntegerField(default=1)
-    description = TextField()
+    name = TextField()
+    recurrence = IntegerField(null=True)
     scheduled = DateField(null=True)
     deadline = DateField(null=True)
-    recurrence = IntegerField(null=True)
-    is_completed = BooleanField(default=False)
-    is_hidden = BooleanField(default=False)
+    archived = BooleanField(default=False)
 
-    @property
-    def days(self):
-        dates = set()
-        for interval in Interval.select(Interval.start).where(Interval.task == self):
-            dates.add(interval.start.date())
-        return len(dates)
+    # @property
+    # def days(self):
+    #     dates = set()
+    #     for interval in Interval.select(Interval.start).where(Interval.task == self):
+    #         dates.add(interval.start.date())
+    #     return len(dates)
 
-    @property
-    def duration(self):
-        durations = list()
-        for interval in Interval.select().where(Interval.task == self):
-            durations.append(interval.duration)
-        return sum(durations)
+    # @property
+    # def duration(self):
+    #     durations = list()
+    #     for interval in Interval.select().where(Interval.task == self):
+    #         durations.append(interval.duration)
+    #     return sum(durations)
 
 
-class Skill(BaseModel):
-    name = TextField()
-
-
-class TaskSkill(BaseModel):
-    task = ForeignKeyField(Task, on_delete="CASCADE")
-    skill = ForeignKeyField(Skill, on_delete="CASCADE")
+class TaskTask(BaseModel):
+    child = ForeignKeyField(Task, on_delete="CASCADE")
+    parent = ForeignKeyField(Task, on_delete="CASCADE")
 
     class Meta:
-        primary_key = CompositeKey("task", "skill")
+        primary_key = CompositeKey("child", "parent")
 
 
 class Interval(BaseModel):
-    task = ForeignKeyField(Task, on_delete="CASCADE")
-
     start = DateTimeField(default=dt.datetime.now)
     end = DateTimeField(null=True)
 
@@ -98,6 +66,14 @@ class Interval(BaseModel):
             return (self.end - self.start).total_seconds()
         else:
             return (dt.datetime.now() - self.start).total_seconds()
+
+
+class IntervalTask(BaseModel):
+    interval = ForeignKeyField(Interval, on_delete="CASCADE")
+    task = ForeignKeyField(Task, on_delete="CASCADE")
+
+    class Meta:
+        primary_key = CompositeKey("interval", "task")
 
 
 models = BaseModel.__subclasses__()
