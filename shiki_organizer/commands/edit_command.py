@@ -90,7 +90,7 @@ def edit_subparsers(subparsers: argparse._SubParsersAction):
     parser.add_argument(
         "--rr",
         help="reset recurence",
-        action='store_true',
+        action="store_true",
     )
     parser.add_argument(
         "-u",
@@ -222,7 +222,7 @@ def run_edit_command(args: argparse.Namespace, parser: argparse.ArgumentParser):
     task.year_divider = args.yd if args.yd else task.year_divider
     task.description = args.description if args.description else task.description
     task.scheduled = scheduled if scheduled else task.scheduled
-    if args.rr: 
+    if args.rr:
         task.recurrence = None
     else:
         task.recurrence = (
