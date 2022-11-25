@@ -33,6 +33,21 @@ class Task(BaseModel):
     deadline = DateField(null=True)
     archived = BooleanField(default=False)
 
+    @property
+    def parents(self):
+        result = set()
+        queue = set(
+            [tt.parent for tt in TaskTask.select().where(TaskTask.child == self)]
+        )
+        while queue:
+            task = queue.pop()
+            parents = [
+                tt.parent for tt in TaskTask.select().where(TaskTask.child == task)
+            ]
+            queue.update([t for t in parents if t not in result])
+            result.add(task)
+        return result
+
     # @property
     # def days(self):
     #     dates = set()

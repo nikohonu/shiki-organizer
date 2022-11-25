@@ -1,6 +1,9 @@
 import argparse
 import datetime as dt
 
+from peewee import Select
+from termcolor import colored
+
 # from shiki_organizer.commands.overview_command import run_overview_command
 # from shiki_organizer.commands.add_command import (
 #     add_category_subparsers,
@@ -96,7 +99,22 @@ def main():
             type=int,
             choices=task_ids,
         )
-    # do
+    # start
+    start_parser: argparse.ArgumentParser = subparsers.add_parser(
+        "start", help="start the task"
+    )
+    start_parser.add_argument(
+        "ids",
+        help="ids of tasks",
+        type=int,
+        nargs="+",
+        choices=task_ids,
+    )
+    # stop
+    stop_parser: argparse.ArgumentParser = subparsers.add_parser(
+        "stop", help="stop a task"
+    )
+    # done
     done_parser = subparsers.add_parser("done", help="complete the task")
     done_parser.add_argument(
         "ids",
@@ -105,6 +123,8 @@ def main():
         nargs="+",
         choices=task_ids,
     )
+    # tree
+    tree_parser = subparsers.add_parser("tree", help="print tasks as tree")
     # ...
     args = parser.parse_args()
     match args.command:
@@ -137,9 +157,99 @@ def main():
                     for parent_id in args.tasks:
                         parent = Task.get_by_id(parent_id)
                         TaskTask.create(child=task, parent=parent)
+        case "start":
+            tasks = set()
+            root_tasks = Task.select().where(Task.id << args.ids)
+            for task in root_tasks:
+                tasks.add(task)
+                parents = task.parents
+                if parents:
+                    tasks.update(parents)
+            current_interval = Interval.get_or_none(Interval.end == None)
+            if not current_interval:
+                interval = Interval.create()
+                for task in tasks:
+                    IntervalTask.create(interval=interval, task=task)
+            else:
+                print("You need to stop the previous task before starting a new one.")
+        case "stop":
+            interval = Interval.get_or_none(Interval.end == None)
+            if interval:
+                interval.end = dt.datetime.now()
+                interval.save()
+        case "tree":
+
+            def get_children(table, parent_id):
+                rows = []
+                children = [
+                    tt.child
+                    for tt in TaskTask.select(TaskTask.child).where(
+                        TaskTask.parent == table[parent_id]["task"]
+                    )
+                ]
+                for task_id in table:
+                    if table[task_id]["task"] in children:
+                        rows.append(task_id)
+                rows.reverse()
+                return rows
+
+            def row_to_str(key, row):
+                divider = f'({row["task"].divider}) '
+                duration = (
+                    colored(f" duration:", "green") + f"{round(row['duration']/60)}"
+                )
+                days = colored(f" days:", "blue") + f"{row['days']}"
+                avg = colored(f" avg:", "cyan") + f"{round(row['avg']/60)}"
+                score = colored(f" score:", "yellow") + f"{round(row['score']/60)}"
+                return f'{divider}{key} {row["task"].name}{duration}{days}{avg}{score}'
+
+            table = {}
+            for task in Task.select().where(Task.archived == False):
+                table[task.id] = {
+                    "task": task,
+                    "duration": 0,
+                    "days": set(),
+                    "avg": 0,
+                    "score": 0,
+                    "parents": TaskTask.select().where(TaskTask.child == task).count(),
+                }
+            for interval in Interval.select():
+                duration = interval.duration
+                date = str(interval.start.date())
+                tasks = set(
+                    [
+                        it.task
+                        for it in IntervalTask.select().where(
+                            IntervalTask.interval == interval
+                        )
+                    ]
+                )
+                for task in tasks:
+                    table[task.id]["days"].add(date)
+                    table[task.id]["duration"] += duration
+            for key in table:
+                table[key]["days"] = len(table[key]["days"])
+                if table[key]["days"]:
+                    table[key]["avg"] = table[key]["duration"] / table[key]["days"]
+                else:
+                    table[key]["avg"] = 0
+                table[key]["score"] = table[key]["duration"] / float(
+                    table[key]["task"].divider
+                )
+            table = dict(sorted(table.items(), key=lambda tag: tag[1]["score"]))
+            queue = [
+                (0, task_id) for task_id in table if table[task_id]["parents"] == 0
+            ]
+            queue.reverse()
+            while queue:
+                row = queue.pop()
+                children = [(row[0] + 1, t) for t in get_children(table, row[1])]
+                queue += children
+                print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
+
         case "done":
-            tasks = Task.select().where(Task.id << args.ids)
-            for task in tasks:
+            root_tasks = Task.select().where(Task.id << args.ids)
+            for task in root_tasks:
                 if task.recurrence:
                     task.scheduled = (
                         dt.datetime.now() + dt.timedelta(days=task.recurrence)

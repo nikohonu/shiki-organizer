@@ -8,6 +8,10 @@
 - Update add command.
 - Update done(do) command.
 - Update edit command.
+- Update start command.
+- Update stop command.
+- Update tree command.
 ### Removed
 - Category.
 - Field.
+- List command.
