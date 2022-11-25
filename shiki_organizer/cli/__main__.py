@@ -44,6 +44,19 @@ from shiki_organizer.model import Interval, IntervalTask, Task, TaskTask
 
 # import appdirs
 # from termcolor import colored
+def str_to_date(date, name, parser):
+    result = None
+    if date:
+        if date == "today":
+            result = dt.date.today()
+        else:
+            try:
+                result: dt.date = dt.datetime.strptime(date, "%Y-%m-%d").date()
+            except ValueError:
+                parser.error(
+                    f"the format of the {name} is incorrect. Try this: YYYY-MM-DD"
+                )
+    return result
 
 
 def main():
@@ -53,28 +66,36 @@ def main():
     # add
     add_parser = subparsers.add_parser("add", help="add task")
     add_parser.add_argument("name", help="name of the task")
-    add_parser.add_argument(
-        "-r", "--recurrence", help="set the recurrence interval", type=int
+    # edit
+    edit_parser = subparsers.add_parser("edit", help="edit the task")
+    edit_parser.add_argument(
+        "id", help="id of the task", type=int, choices=[t.id for t in Task.select()]
     )
-    add_parser.add_argument(
-        "-s",
-        "--scheduled",
-        help="the date when you plan to start working on that task. Example: 2022-10-13",
-    )
+    edit_parser.add_argument("-n", "--name", help="name of the task")
+    # edit & add
+    for p in [add_parser, edit_parser]:
+        p.add_argument(
+            "-r", "--recurrence", help="set the recurrence interval", type=int
+        )
+        p.add_argument(
+            "-s",
+            "--scheduled",
+            help="the date when you plan to start working on that task. Example: 2022-10-13",
+        )
 
-    add_parser.add_argument(
-        "-d",
-        "--deadline",
-        help="the date when you plan to finish working on that task. Example: 2022-10-23",
-    )
-    add_parser.add_argument(
-        "-t",
-        "--tasks",
-        nargs="+",
-        help="ids of parent tasks",
-        type=int,
-        choices=task_ids,
-    )
+        p.add_argument(
+            "-d",
+            "--deadline",
+            help="the date when you plan to finish working on that task. Example: 2022-10-23",
+        )
+        p.add_argument(
+            "-t",
+            "--tasks",
+            nargs="+",
+            help="ids of parent tasks",
+            type=int,
+            choices=task_ids,
+        )
     # do
     done_parser = subparsers.add_parser("done", help="complete the task")
     done_parser.add_argument(
@@ -88,32 +109,8 @@ def main():
     args = parser.parse_args()
     match args.command:
         case "add":
-            scheduled = None
-            deadline = None
-            if args.scheduled:
-                if args.scheduled == "today":
-                    scheduled = dt.date.today()
-                else:
-                    try:
-                        scheduled = dt.datetime.strptime(
-                            args.scheduled, "%Y-%m-%d"
-                        ).date()
-                    except ValueError:
-                        parser.error(
-                            "the format of the schedule is incorrect. Try this: YYYY-MM-DD"
-                        )
-            if args.deadline:
-                if args.deadline == "today":
-                    deadline = dt.date.today()
-                else:
-                    try:
-                        deadline: dt.date = dt.datetime.strptime(
-                            args.deadline, "%Y-%m-%d"
-                        ).date()
-                    except ValueError:
-                        parser.error(
-                            "the format of the deadline is incorrect. Try this: YYYY-MM-DD"
-                        )
+            scheduled = str_to_date(args.scheduled, "scheduled", parser)
+            deadline = str_to_date(args.deadline, "deadline", parser)
             task = Task.create(
                 name=args.name,
                 recurrence=args.recurrence,
@@ -124,6 +121,22 @@ def main():
                 for parent_id in args.tasks:
                     parent = Task.get_by_id(parent_id)
                     TaskTask.create(child=task, parent=parent)
+        case "edit":
+            scheduled = str_to_date(args.scheduled, "scheduled", parser)
+            deadline = str_to_date(args.deadline, "deadline", parser)
+            task = Task.get_by_id(args.id)
+            task.name = args.name if args.name else task.name
+            task.recurrence = args.recurrence if args.recurrence else task.recurrence
+            task.scheduled = scheduled if scheduled else task.scheduled
+            task.deadline = deadline if deadline else task.deadline
+            task.save()
+            if args.tasks:
+                q = TaskTask.delete().where(TaskTask.child == task)
+                q.execute()
+                if args.tasks:
+                    for parent_id in args.tasks:
+                        parent = Task.get_by_id(parent_id)
+                        TaskTask.create(child=task, parent=parent)
         case "done":
             tasks = Task.select().where(Task.id << args.ids)
             for task in tasks:
