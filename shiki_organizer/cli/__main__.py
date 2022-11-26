@@ -1,12 +1,11 @@
 import argparse
 import datetime as dt
 import random
-from functools import partial
 
 from peewee import Select
 from termcolor import colored
 
-from shiki_organizer.actions import stop
+from shiki_organizer.actions import get_status, stop
 from shiki_organizer.model import Interval, Task
 
 
@@ -159,8 +158,8 @@ def main():
                 print("You need to stop the previous task before starting a new one.")
             print(f"Start {task.name}")
         case "stop":
+            print(get_status("Task stopped ", True))
             task = stop()
-            print(f"Stop {task.name}")
         case "tree":
 
             def row_to_str(key, row):
@@ -285,17 +284,10 @@ def main():
                 else:
                     task.archived = True
                 task.save()
+            print(get_status("Task done ", True))
             task = stop()
-            print(f"{task.name} done")
         case "status":
-            interval = Interval.get_or_none(Interval.end == None)
-            if interval:
-                task = interval.task
-                print(
-                    f"Current task is {task.name}. Start: {dt.date.strftime(interval.start, '%X')}. Duration: {dt.timedelta(seconds=round(interval.duration))}."
-                )
-            else:
-                print("Tasks are not currently being tracked")
+            print(get_status())
         case "elo":
 
             def get_expected_score(r_a, r_b):
