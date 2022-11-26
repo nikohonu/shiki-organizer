@@ -6,6 +6,7 @@ from peewee import Select
 from termcolor import colored
 
 from shiki_organizer.model import Interval, Task
+from shiki_organizer.actions import stop 
 
 
 def str_to_date(date, name, parser):
@@ -147,10 +148,8 @@ def main():
                 print("You need to stop the previous task before starting a new one.")
             print(f"Start {task.name}")
         case "stop":
-            interval = Interval.get_or_none(Interval.end == None)
-            if interval:
-                interval.end = dt.datetime.now()
-                interval.save()
+            task = stop()
+            print(f"Stop {task.name}")
         case "tree":
 
             def row_to_str(key, row):
@@ -253,6 +252,8 @@ def main():
                 else:
                     task.archived = True
                 task.save()
+            task = stop()
+            print(f"{task.name} done")
         case _:
             print("-" * 10 + "Week" + "-" * 10)
             need = 40

@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- actions.py for sharing commands between GUI and CLI.
 ### Changed
 - Update dependencies.
 - Change folder structure.
