@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- Add status command.
+
 ## [0.4.0] - 2022-11-26
 ### Added
 - actions.py for sharing commands between GUI and CLI.

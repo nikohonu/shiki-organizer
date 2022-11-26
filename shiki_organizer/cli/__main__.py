@@ -122,7 +122,8 @@ def main():
         help="hide tasks with scheduled",
         action="store_true",
     )
-
+    # status
+    tree_parser = subparsers.add_parser("status", help="print current interval")
     # ...
     args = parser.parse_args()
     match args.command:
@@ -270,6 +271,13 @@ def main():
                 task.save()
             task = stop()
             print(f"{task.name} done")
+        case "status":
+            interval = Interval.get_or_none(Interval.end == None)
+            if interval:
+                task = interval.task
+                print(f"Current task is {task.name}. Start: {dt.date.strftime(interval.start, '%X')}. Duration: {dt.timedelta(seconds=round(interval.duration))}.")
+            else:
+                print("Tasks are not currently being tracked")
         case _:
             print("-" * 10 + "Week" + "-" * 10)
             need = 40
