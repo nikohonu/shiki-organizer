@@ -5,8 +5,8 @@ from functools import partial
 from peewee import Select
 from termcolor import colored
 
+from shiki_organizer.actions import stop
 from shiki_organizer.model import Interval, Task
-from shiki_organizer.actions import stop 
 
 
 def str_to_date(date, name, parser):
@@ -116,6 +116,12 @@ def main():
         help="show only today tasks",
         action="store_true",
     )
+    tree_parser.add_argument(
+        "-s",
+        "--hide_scheduled",
+        help="hide tasks with scheduled",
+        action="store_true",
+    )
 
     # ...
     args = parser.parse_args()
@@ -178,6 +184,14 @@ def main():
                 score = colored(f" score:", "yellow") + f"{round(row['score']/60)}"
                 return f'{divider}{key} {row["task"].name}{scheduled}{recurrence}{deadline}{duration}{days}{avg}{score}'
 
+            def sort_queue(queue):
+                queue = sorted(queue, key=lambda x: table[x[1]]["score"], reverse=True)
+                if args.hide_scheduled:
+                    queue = list(
+                        filter(lambda x: table[x[1]]["task"].scheduled == None, queue)
+                    )
+                return queue
+
             table = {}
             for task in Task.select().where(Task.archived == False):
                 table[task.id] = {
@@ -191,8 +205,9 @@ def main():
                 duration = interval.duration
                 date = str(interval.start.date())
                 for task in interval.task.parents + [interval.task]:
-                    table[task.id]["days"].add(date)
-                    table[task.id]["duration"] += duration
+                    if task.id in table:
+                        table[task.id]["days"].add(date)
+                        table[task.id]["duration"] += duration
             for key in table:
                 table[key]["days"] = len(table[key]["days"])
                 if table[key]["days"]:
@@ -223,12 +238,13 @@ def main():
                     for task_id in table
                     if table[task_id]["task"].parent == None
                 ]
-            queue.reverse()
+            queue = sort_queue(queue)
             while queue:
                 row = queue.pop()
                 children = [
                     (row[0] + 1, t.id) for t in table[row[1]]["task"].direct_children
                 ]
+                children = sort_queue(children)
                 queue += children
                 print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
         case "del":
@@ -270,11 +286,11 @@ def main():
                 print("have/need:", f"{have}/{need}={round((have/need)*10000)/100}%")
             print("last", f"{need}-{have}={need-have}")
             print("-" * 10 + "Day" + "-" * 10)
-            today = dt.date.today()
-            if today.weekday() >= 5:
-                need = 0
-            else:
-                need = 8
+            # if today.weekday() >= 5:
+            # need = 8
+            # else:
+            # need = 8
+            need = 10
             have = 0
             for interval in Interval.select():
                 if interval.start.date() >= today:
