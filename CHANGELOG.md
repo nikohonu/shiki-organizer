@@ -3,6 +3,7 @@
 ## [Unreleased]
 ### Added
 - Add status command.
+- Add elo command.
 
 ## [0.4.0] - 2022-11-26
 ### Added

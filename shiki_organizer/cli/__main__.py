@@ -1,5 +1,6 @@
 import argparse
 import datetime as dt
+import random
 from functools import partial
 
 from peewee import Select
@@ -123,7 +124,10 @@ def main():
         action="store_true",
     )
     # status
-    tree_parser = subparsers.add_parser("status", help="print current interval")
+    status_parser = subparsers.add_parser("status", help="print current interval")
+    # elo
+    elo_parser = subparsers.add_parser("elo", help="set rating of task by elo")
+    elo_parser.add_argument("-c", "--count", help="game count", type=int)
     # ...
     args = parser.parse_args()
     match args.command:
@@ -191,6 +195,18 @@ def main():
                     queue = list(
                         filter(lambda x: table[x[1]]["task"].scheduled == None, queue)
                     )
+                elo = [table[x[1]]["task"].rating for x in queue]
+                for x in queue:
+                    task = table[x[1]]["task"]
+                    if max(elo) == min(elo):
+                        table[x[1]]["task"].divider = 1
+                    else:
+                        result = 1 + (task.rating - min(elo)) / (max(elo) - min(elo))
+                        table[x[1]]["task"].divider = round(result * 100) / 100
+                        table[x[1]]["score"] = table[x[1]]["duration"] / result
+                tasks = [table[x[1]]["task"] for x in queue]
+                if tasks:
+                    Task.bulk_update(tasks, fields=[Task.divider])
                 return queue
 
             table = {}
@@ -275,9 +291,55 @@ def main():
             interval = Interval.get_or_none(Interval.end == None)
             if interval:
                 task = interval.task
-                print(f"Current task is {task.name}. Start: {dt.date.strftime(interval.start, '%X')}. Duration: {dt.timedelta(seconds=round(interval.duration))}.")
+                print(
+                    f"Current task is {task.name}. Start: {dt.date.strftime(interval.start, '%X')}. Duration: {dt.timedelta(seconds=round(interval.duration))}."
+                )
             else:
                 print("Tasks are not currently being tracked")
+        case "elo":
+
+            def get_expected_score(r_a, r_b):
+                return 1 / (1 + 10 ** ((r_a - r_b) / 400))
+
+            def get_new_rating(r_a, r_b, score):
+                return r_a + 32 * (score - get_expected_score(r_a, r_b))
+
+            for _ in range(args.count):
+                count = 0
+                task: Task
+                while count < 2:
+                    tasks = list(Task.select())
+                    task = random.choice(tasks)
+                    count = Task.select().where(Task.parent == task.parent).count()
+
+                tasks = Task.select().where(Task.parent == task.parent)
+
+                task_a = random.choice(tasks)
+                task_b = random.choice(tasks)
+                while task_a == task_b:
+                    task_b = random.choice(tasks)
+                a = task_a.rating
+                b = task_b.rating
+                raw_score = ""
+                while raw_score not in ["1", "2", "="]:
+                    raw_score = input(
+                        f'Which task is more important:\n"{task_a.name} (1)" vs "{task_b.name} (2)" (= for equal): '
+                    )
+                match raw_score:
+                    case "1":
+                        score = 1
+                    case "2":
+                        score = 0
+                    case _:
+                        score = 0.5
+                task_a.rating = get_new_rating(a, b, score)
+                task_b.rating = get_new_rating(b, a, 1 - score)
+                print(
+                    f"{task_a.name} ({task_a.rating}), {task_b.name} ({task_b.rating})"
+                )
+                task_a.save()
+                task_b.save()
+
         case _:
             print("-" * 10 + "Week" + "-" * 10)
             need = 40
