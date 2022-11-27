@@ -4,6 +4,8 @@
 ### Added
 - Add status command.
 - Add elo command.
+### Fixed
+- Archived task with parent task do not break the "tree" command
 
 ## [0.4.0] - 2022-11-26
 ### Added

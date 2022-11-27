@@ -209,7 +209,7 @@ def main():
                 return queue
 
             table = {}
-            for task in Task.select().where(Task.archived == False):
+            for task in Task.select():
                 table[task.id] = {
                     "task": task,
                     "duration": 0,
@@ -262,7 +262,8 @@ def main():
                 ]
                 children = sort_queue(children)
                 queue += children
-                print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
+                if table[row[1]]['task'].archived == False:
+                    print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
         case "del":
             tasks = Task.select().where(Task.id << args.ids)
             for task in tasks:
