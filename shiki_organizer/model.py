@@ -2,7 +2,6 @@ import datetime as dt
 
 from peewee import (
     BooleanField,
-    CompositeKey,
     DateField,
     DateTimeField,
     ForeignKeyField,
@@ -26,7 +25,6 @@ class BaseModel(Model):
 
 class Task(BaseModel):
     rating = IntegerField(default=1000)
-    divider = IntegerField(default=1)
     name = TextField()
     recurrence = IntegerField(null=True)
     scheduled = DateField(null=True)

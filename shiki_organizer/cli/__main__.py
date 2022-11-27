@@ -163,7 +163,7 @@ def main():
         case "tree":
 
             def row_to_str(key, row):
-                divider = f'({row["task"].divider}) '
+                rating = f'({row["task"].rating}) '
                 scheduled = row["task"].scheduled
                 scheduled = (
                     colored(f" scheduled:", "magenta") + str(scheduled)
@@ -186,10 +186,9 @@ def main():
                 days = colored(f" days:", "blue") + f"{row['days']}"
                 avg = colored(f" avg:", "cyan") + f"{round(row['avg']/60)}"
                 score = colored(f" score:", "yellow") + f"{round(row['score']/60)}"
-                return f'{divider}{key} {row["task"].name}{scheduled}{recurrence}{deadline}{duration}{days}{avg}{score}'
+                return f'{rating}{key} {row["task"].name}{scheduled}{recurrence}{deadline}{duration}{days}{avg}{score}'
 
             def sort_queue(queue):
-                queue = sorted(queue, key=lambda x: table[x[1]]["score"], reverse=True)
                 if args.hide_scheduled:
                     queue = list(
                         filter(lambda x: table[x[1]]["task"].scheduled == None, queue)
@@ -197,15 +196,18 @@ def main():
                 elo = [table[x[1]]["task"].rating for x in queue]
                 for x in queue:
                     task = table[x[1]]["task"]
-                    if max(elo) == min(elo):
-                        table[x[1]]["task"].divider = 1
-                    else:
-                        result = 1 + (task.rating - min(elo)) / (max(elo) - min(elo))
-                        table[x[1]]["task"].divider = round(result * 100) / 100
-                        table[x[1]]["score"] = table[x[1]]["duration"] / result
+                    table[x[1]]["score"] = table[x[1]]["duration"] / (
+                        task.rating / 1000
+                    )
                 tasks = [table[x[1]]["task"] for x in queue]
-                if tasks:
-                    Task.bulk_update(tasks, fields=[Task.divider])
+                if args.today:
+                    queue = sorted(
+                        queue, key=lambda x: table[x[1]]["task"].rating, reverse=False
+                    )
+                else:
+                    queue = sorted(
+                        queue, key=lambda x: table[x[1]]["score"], reverse=True
+                    )
                 return queue
 
             table = {}
@@ -230,9 +232,6 @@ def main():
                     table[key]["avg"] = table[key]["duration"] / table[key]["days"]
                 else:
                     table[key]["avg"] = 0
-                table[key]["score"] = table[key]["duration"] / float(
-                    table[key]["task"].divider
-                )
             table = dict(sorted(table.items(), key=lambda tag: tag[1]["score"]))
             if args.today:
                 table = dict(
@@ -262,7 +261,7 @@ def main():
                 ]
                 children = sort_queue(children)
                 queue += children
-                if table[row[1]]['task'].archived == False:
+                if table[row[1]]["task"].archived == False:
                     print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
         case "del":
             tasks = Task.select().where(Task.id << args.ids)
@@ -297,6 +296,7 @@ def main():
             def get_new_rating(r_a, r_b, score):
                 return r_a + 32 * (score - get_expected_score(r_a, r_b))
 
+            args.count = 1 if not args.count else args.count
             for _ in range(args.count):
                 count = 0
                 task: Task
@@ -349,10 +349,6 @@ def main():
                 print("have/need:", f"{have}/{need}={round((have/need)*10000)/100}%")
             print("last", f"{need}-{have}={need-have}")
             print("-" * 10 + "Day" + "-" * 10)
-            # if today.weekday() >= 5:
-            # need = 8
-            # else:
-            # need = 8
             need = 10
             have = 0
             for interval in Interval.select():
