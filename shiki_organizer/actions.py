@@ -24,4 +24,4 @@ def get_status(message="Tracking") -> str:
     ).rjust(21, " ")
     start = interval.start.strftime("%Y-%m-%dT%H:%M:%S").rjust(19, " ")
     end = diff(start, end.strftime("%Y-%m-%dT%H:%M:%S")).rjust(19, " ")
-    return f'{message} "{task.name}"\n  Started {interval.start}\n  Current {end}\n  Total {duration}'
+    return f'{message} "{task.description}"\n  Started {interval.start}\n  Current {end}\n  Total {duration}'

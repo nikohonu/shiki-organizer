@@ -7,6 +7,7 @@ from peewee import (
     DateTimeField,
     ForeignKeyField,
     IntegerField,
+    ManyToManyField,
     Model,
     SqliteDatabase,
     TextField,
@@ -25,18 +26,40 @@ class BaseModel(Model):
         database = database
 
 
+class Project(BaseModel):
+    name = TextField()
+
+    @staticmethod
+    def remove_unused():
+        tasks = Task.select()
+        for project in Project.select():
+            if tasks.where(Task.project == project).count() == 0:
+                project.delete_instance()
+
+
+class Tag(BaseModel):
+    name = TextField()
+
+    @staticmethod
+    def remove_unused():
+        tasks = TaskTag.select()
+        for tag in Tag.select():
+            if tasks.where(TaskTag.tag == tag).count() == 0:
+                tag.delete_instance()
+
+
 class Task(BaseModel):
     uuid = UUIDField(primary_key=True, default=uuid_module.uuid4)
     id = IntegerField(null=True)
     created = DateTimeField(default=dt.datetime.now())
-    priority = IntegerField(default=0)
-    divider = IntegerField(default=1)
-    name = TextField()
+    priority = TextField(null=True)
+    description = TextField()
     recurrence = IntegerField(null=True)
     scheduled = DateField(null=True)
     deadline = DateField(null=True)
     archived = BooleanField(default=False)
-    parent = ForeignKeyField("self", on_delete="CASCADE", null=True)
+    project = ForeignKeyField(Project, null=True, backref="tasks")
+    tags = ManyToManyField(Tag, backref="tasks")
 
     @staticmethod
     def get_by_uuid(uuid):
@@ -58,35 +81,14 @@ class Task(BaseModel):
                 task.id = None
         Task.bulk_update(tasks, [Task.id])
 
-    @property
-    def parents(self):
-        result = []
-        q = self.parent
-        while q:
-            result.append(q)
-            q = q.parent
-        return result
 
-    @property
-    def children(self):
-        result = []
-        queue = list(Task.select().where(Task.parent == self))
-        while queue:
-            task = queue.pop()
-            queue += list(Task.select().where(Task.parent == task))
-            result.append(task)
-        return result
-
-    @property
-    def direct_children(self):
-        return list(Task.select().where(Task.parent == self))
+TaskTag = Task.tags.get_through_model()
 
 
 class Interval(BaseModel):
     uuid = UUIDField(primary_key=True, default=uuid_module.uuid4)
     id = IntegerField(null=True)
-    task = ForeignKeyField(Task, on_delete="CASCADE", null=True)
-    description = TextField(null=True)
+    task = ForeignKeyField(Task, null=True, backref="intervals")
     start = DateTimeField(default=dt.datetime.now)
     end = DateTimeField(null=True)
 
@@ -97,7 +99,6 @@ class Interval(BaseModel):
     @staticmethod
     def get_by_id(id):
         return Interval.get(Interval.id == id)
-
 
     @staticmethod
     def reindex():
@@ -116,5 +117,5 @@ class Interval(BaseModel):
             return (dt.datetime.now() - self.start).total_seconds()
 
 
-models = BaseModel.__subclasses__()
+models = BaseModel.__subclasses__() + [TaskTag]
 database.create_tables(models)

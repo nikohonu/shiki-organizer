@@ -141,17 +141,6 @@ optional = false
 python-versions = "<3.12,>=3.7"
 
 [[package]]
-name = "termcolor"
-version = "2.1.1"
-description = "ANSI color formatting for output in terminal"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-
-[package.extras]
-tests = ["pytest", "pytest-cov"]
-
-[[package]]
 name = "tomli"
 version = "2.0.1"
 description = "A lil' TOML parser"
@@ -162,7 +151,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "2a9937d9128819d0b61e9fbe5b0ce4ecd2158df60dcd14775fafb6169d41a36a"
+content-hash = "02e0c3b859e47745b95364c05aba94542ed5152c3a351a658ea3053eb148f40a"
 
 [metadata.files]
 appdirs = [
@@ -250,10 +239,6 @@ shiboken6 = [
     {file = "shiboken6-6.4.1-pp39-pypy39_pp73-macosx_10_9_universal2.whl", hash = "sha256:1c3efc307ed20bf9cea5ceafc089032b33aba95297f70e469b5a19f1070eb1e8"},
     {file = "shiboken6-6.4.1-pp39-pypy39_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:7cee2cb6becd29e55913468602fa90554895ad38448d57f1d2ebe681014b087d"},
     {file = "shiboken6-6.4.1-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:44f81fe7faa4ee3a313e687c8a4852bba454116822e76f80339b2aa0512cfc6a"},
-]
-termcolor = [
-    {file = "termcolor-2.1.1-py3-none-any.whl", hash = "sha256:fa852e957f97252205e105dd55bbc23b419a70fec0085708fc0515e399f304fd"},
-    {file = "termcolor-2.1.1.tar.gz", hash = "sha256:67cee2009adc6449c650f6bcf3bdeed00c8ba53a8cda5362733c53e0a39fb70b"},
 ]
 tomli = [
     {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},
