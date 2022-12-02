@@ -1,14 +1,12 @@
-import argparse
 import datetime as dt
 import math
-import random
 import uuid
 
 import click
-from peewee import Select
+from colorama import Fore, Style
 from termcolor import colored
 
-from shiki_organizer.actions import get_status, stop
+from shiki_organizer.actions import get_status
 from shiki_organizer.model import Interval, Task
 
 
@@ -401,6 +399,111 @@ def done(task):
     print(f"Completed task {task.id} '{task.name}'.")
 
 
+@click.command()
+@click.option("-u/-n", "--uuid/--no-uuid", default=False, help="Show only today tasks")
+def interval_list(uuid):
+    for interval in Interval.select():
+        if uuid:
+            uuid = f"{Fore.CYAN}uuid:{Style.RESET_ALL}{interval.uuid} "
+        else:
+            uuid = ""
+        id = f"{Fore.RED}id:{Style.RESET_ALL}{interval.id} "
+        if interval.task:
+            task = f"{Fore.YELLOW}task:{Style.RESET_ALL}'{interval.task.name}' "
+        else:
+            task = ""
+        if interval.description:
+            description = (
+                f"{Fore.GREEN}description:{Style.RESET_ALL}{interval.description} "
+            )
+        else:
+            description = ""
+        start = f"{Fore.BLUE}start:{Style.RESET_ALL}'{interval.start}' "
+        if interval.end:
+            end = f"{Fore.MAGENTA}end:{Style.RESET_ALL}'{interval.end}'"
+        else:
+            end = ""
+        print(f"{uuid}{id}{task}{description}{start}{end}")
+
+
+@click.command()
+@click.argument("interval")
+@click.option(
+    "-t",
+    "--task",
+    is_flag=False,
+    flag_value="",
+    help="Id or uuid of the parent task.",
+    type=str,
+)
+@click.option(
+    "-d",
+    "--description",
+    is_flag=False,
+    flag_value="",
+    help="Description of interval.",
+    type=str,
+)
+@click.option(
+    "-s",
+    "--start",
+    type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
+    help="Start of the interval",
+)
+@click.option(
+    "-e",
+    "--end",
+    is_flag=False,
+    flag_value="0001-01-01T00:00:00",
+    type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
+    help="End of the interval",
+)
+def modify_interval(interval, task, description, start, end):
+    if interval.isnumeric():
+        interval = Interval.get_by_id(int(interval))
+    else:
+        interval = Interval.get_by_uuid(uuid.UUID(interval))
+    if task == None:
+        task = interval.task
+    elif task == "":
+        task = None
+    else:
+        if task.isnumeric():
+            task = Task.get_by_id(int(task))
+        else:
+            task = Task.get_by_uuid(uuid.UUID(task))
+    if description == None:
+        description = interval.description
+    elif description == "":
+        description = None
+    if start == None:
+        start = interval.start
+    if end == None:
+        end = interval.end
+    elif end == dt.datetime.min:
+        end = None
+    q = interval.update(
+        task=task,
+        description=description,
+        start=start,
+        end=end,
+    ).where(Interval.id == interval.id)
+    q.execute()
+    print(f"Modifying interval {interval.id}'.")
+
+
+@click.command()
+@click.argument("interval")
+def delete_interval(interval):
+    if interval.isnumeric():
+        interval = Interval.get_by_id(int(interval))
+    else:
+        interval = Interval.get_by_uuid(uuid.UUID(interval))
+    interval.delete_instance()
+    print(f"Deleting interval {interval.id}.")
+    Interval.reindex()
+
+
 cli.add_command(add)
 cli.add_command(modify)
 cli.add_command(start)
@@ -410,6 +513,9 @@ cli.add_command(delete)
 cli.add_command(normalize)
 cli.add_command(status)
 cli.add_command(done)
+cli.add_command(interval_list)
+cli.add_command(modify_interval)
+cli.add_command(delete_interval)
 
 
 def main():

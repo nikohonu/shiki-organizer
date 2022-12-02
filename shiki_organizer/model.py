@@ -90,6 +90,14 @@ class Interval(BaseModel):
     start = DateTimeField(default=dt.datetime.now)
     end = DateTimeField(null=True)
 
+    @staticmethod
+    def get_by_uuid(uuid):
+        return Interval.get(Interval.uuid == uuid)
+
+    @staticmethod
+    def get_by_id(id):
+        return Interval.get(Interval.id == id)
+
 
     @staticmethod
     def reindex():

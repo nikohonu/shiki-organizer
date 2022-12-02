@@ -4,6 +4,9 @@
 ### Added
 - Add status command.
 - Add normalize command.
+- Add interval-list command.
+- Add modify-interval command.
+- Add delete-interval command.
 ### Changed
 - Replace "click" with "argparse".
 ### Fixed
