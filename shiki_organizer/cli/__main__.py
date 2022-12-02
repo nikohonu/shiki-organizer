@@ -1,7 +1,10 @@
 import argparse
 import datetime as dt
+import math
 import random
+import uuid
 
+import click
 from peewee import Select
 from termcolor import colored
 
@@ -9,19 +12,404 @@ from shiki_organizer.actions import get_status, stop
 from shiki_organizer.model import Interval, Task
 
 
-def str_to_date(date, name, parser):
-    result = None
-    if date:
-        if date == "today":
-            result = dt.date.today()
+@click.group()
+def cli():
+    pass
+
+
+@click.command()
+@click.argument("name")
+@click.option(
+    "-p", "--priority", default=0, help="Priority of the task.", type=click.IntRange(0)
+)
+@click.option(
+    "-i",
+    "--divider",
+    default=1,
+    help="Divider of the task score.",
+    type=click.IntRange(0),
+)
+@click.option(
+    "-r",
+    "--recurrence",
+    is_flag=False,
+    flag_value=1,
+    help="Recurrence interval of the task.",
+    type=click.IntRange(1),
+)
+@click.option(
+    "-s",
+    "--scheduled",
+    is_flag=False,
+    flag_value=str(dt.date.today()),
+    help="Date when you plan to start working on this task.",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+)
+@click.option(
+    "-d",
+    "--deadline",
+    is_flag=False,
+    flag_value=str(dt.date.today()),
+    help="Date when you plan to complete the work on this task.",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+)
+@click.option(
+    "-a",
+    "--parent",
+    help="Id or uuid of the parent task.",
+    type=str,
+)
+def add(name, priority, divider, recurrence, scheduled, deadline, parent):
+    if parent:
+        if parent.isnumeric():
+            parent = Task.get_by_id(int(parent))
         else:
-            try:
-                result: dt.date = dt.datetime.strptime(date, "%Y-%m-%d").date()
-            except ValueError:
-                parser.error(
-                    f"the format of the {name} is incorrect. Try this: YYYY-MM-DD"
-                )
-    return result
+            parent = uuid.UUID(parent)
+    task = Task.create(
+        name=name,
+        priority=priority,
+        divider=divider,
+        recurrence=recurrence,
+        scheduled=scheduled.date() if scheduled else None,
+        deadline=deadline.date() if deadline else None,
+        parent=parent,
+    )
+    Task.reindex()
+    task = Task.get_by_uuid(task.uuid)
+    print(f"Created task {task.id}.")
+
+
+@click.command()
+@click.argument("task")
+@click.option("-n", "--name", help="Name of a task.")
+@click.option(
+    "-p",
+    "--priority",
+    is_flag=False,
+    flag_value=0,
+    help="Priority of the task.",
+    type=click.IntRange(0),
+)
+@click.option(
+    "-i",
+    "--divider",
+    is_flag=False,
+    flag_value=1,
+    default=1,
+    help="Divider of the task score.",
+    type=click.IntRange(0),
+)
+@click.option(
+    "-r",
+    "--recurrence",
+    is_flag=False,
+    flag_value=0,
+    help="Recurrence interval of the task.",
+    type=click.IntRange(0),
+)
+@click.option(
+    "-s",
+    "--scheduled",
+    is_flag=False,
+    flag_value="0001-01-01",
+    help="Date when you plan to start working on this task.",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+)
+@click.option(
+    "-d",
+    "--deadline",
+    is_flag=False,
+    flag_value="0001-01-01",
+    help="Date when you plan to complete the work on this task.",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+)
+@click.option(
+    "-a",
+    "--parent",
+    is_flag=False,
+    flag_value="",
+    help="Id or uuid of the parent task.",
+    type=str,
+)
+def modify(task, name, priority, divider, recurrence, scheduled, deadline, parent):
+    if task.isnumeric():
+        task = Task.get_by_id(int(task))
+    else:
+        task = Task.get_by_uuid(uuid.UUID(task))
+    name = task.name if name == None else name
+    priority = task.priority if priority == None else priority
+    divider = task.divider if divider == None else divider
+    if recurrence == 0:
+        recurrence = None
+    elif recurrence == None:
+        recurrence = task.recurrence
+    else:
+        recurrence
+    if scheduled == dt.date.min:
+        scheduled = None
+    elif scheduled == None:
+        scheduled = task.scheduled
+    else:
+        scheduled.date()
+    if deadline == dt.date.min:
+        deadline = None
+    elif deadline == None:
+        deadline = task.deadline
+    else:
+        deadline.date()
+    if parent == "":
+        parent = None
+    elif parent == None:
+        parent = task.parent
+    else:
+        if parent.isnumeric():
+            parent = Task.get_by_id(int(parent))
+        else:
+            parent = uuid.UUID(parent)
+    q = task.update(
+        name=name,
+        priority=priority,
+        divider=divider,
+        recurrence=recurrence,
+        scheduled=scheduled,
+        deadline=deadline,
+        parent=parent,
+    ).where(Task.id == task.id)
+    q.execute()
+    print(f"Modifying task {task.id} '{task.name}'.")
+
+
+@click.command()
+@click.option("-t", "--task", type=str, help="Id or uuid of the task")
+@click.option("-d", "--description", type=str, help="Іnterval description")
+@click.option(
+    "-s",
+    "--start",
+    type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
+    default=dt.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    help="Start of the interval",
+)
+@click.option(
+    "-e",
+    "--end",
+    type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
+    help="End of the interval",
+)
+def start(task, description, start, end):
+    if task.isnumeric():
+        task = Task.get_by_id(int(task))
+    else:
+        task = Task.get_by_uuid(uuid.UUID(task))
+    interval = Interval.get_or_none(Interval.end == None)
+    if interval:
+        if interval.task == task:
+            print(get_status())
+            return
+        else:
+            now = dt.datetime.now()
+            interval.end = dt.datetime(
+                now.year, now.month, now.day, now.hour, now.minute, now.second
+            )
+            interval.save()
+            print(get_status("Recorded"))
+    if end and end < start:
+        end = None
+        print("The end of the interval must be after the start.")
+        return
+    Interval.create(task=task, start=start, end=end, description=description)
+    print(get_status())
+    Interval.reindex()
+
+
+@click.command()
+def stop():
+    interval = Interval.get_or_none(Interval.end == None)
+    if interval:
+        print(get_status("Recorded"))
+        interval.end = dt.datetime.now()
+        interval.save()
+    else:
+        print("There is no active time tracking.")
+
+
+@click.command()
+@click.option("-s", "--hide-scheduled", type=bool, help="ide tasks with scheduled")
+@click.option(
+    "-t/-n", "--today/--no-today", default=False, help="Show only today tasks"
+)
+def tree(today, hide_scheduled):
+    def row_to_str(key, row):
+        if row["task"].divider != 1:
+            divider = f'({row["task"].divider}) '
+        else:
+            divider = ""
+        if row["task"].priority != 0:
+            priority = f'({row["task"].priority}) '
+        else:
+            priority = ""
+        scheduled = row["task"].scheduled
+        scheduled = (
+            colored(f" scheduled:", "magenta") + str(scheduled) if scheduled else ""
+        )
+        deadline = row["task"].deadline
+        deadline = colored(f" deadline:", "red") + str(deadline) if deadline else ""
+        recurrence = row["task"].recurrence
+        recurrence = (
+            colored(f" recurrence:", "yellow") + str(recurrence) + "d"
+            if recurrence
+            else ""
+        )
+        duration = colored(f" duration:", "green") + f"{round(row['duration']/60)}"
+        days = colored(f" days:", "blue") + f"{row['days']}"
+        avg = colored(f" avg:", "cyan") + f"{round(row['avg']/60)}"
+        score = colored(f" score:", "yellow") + f"{round(row['score']/60)}"
+        return f'{divider}{priority}{key} {row["task"].name}{scheduled}{recurrence}{deadline}{duration}{days}{avg}{score}'
+
+    def sort_queue(queue):
+        if hide_scheduled:
+            queue = list(filter(lambda x: table[x[1]]["task"].scheduled == None, queue))
+        for x in queue:
+            task = table[x[1]]["task"]
+            if task.divider != 0:
+                table[x[1]]["score"] = table[x[1]]["duration"] / task.divider
+            else:
+                table[x[1]]["score"] = -1
+        if today:
+            queue = sorted(
+                queue,
+                key=lambda x: table[x[1]]["task"].priority
+                if table[x[1]]["task"].priority != 0
+                else float("infinity"),
+                reverse=True,
+            )
+        else:
+            queue = sorted(queue, key=lambda x: table[x[1]]["score"], reverse=True)
+            queue = list(filter(lambda x: table[x[1]]["score"] != -1, queue))
+        return queue
+
+    table = {}
+    for task in Task.select():
+        table[task.id] = {
+            "task": task,
+            "duration": 0,
+            "days": set(),
+            "avg": 0,
+            "score": 0,
+        }
+    for interval in Interval.select():
+        duration = interval.duration
+        date = str(interval.start.date())
+        for task in interval.task.parents + [interval.task]:
+            if task.id in table:
+                table[task.id]["days"].add(date)
+                table[task.id]["duration"] += duration
+    for key in table:
+        table[key]["days"] = len(table[key]["days"])
+        if table[key]["days"]:
+            table[key]["avg"] = table[key]["duration"] / table[key]["days"]
+        else:
+            table[key]["avg"] = 0
+    table = dict(sorted(table.items(), key=lambda tag: tag[1]["score"]))
+    if today:
+        table = dict(
+            sorted(
+                table.items(),
+                key=lambda tag: tag[1]["task"].scheduled
+                if tag[1]["task"].scheduled != None
+                else dt.date.max,
+            )
+        )
+        queue = [
+            (0, task_id)
+            for task_id in table
+            if table[task_id]["task"].scheduled == dt.date.today()
+        ]
+    else:
+        queue = [
+            (0, task_id) for task_id in table if table[task_id]["task"].parent == None
+        ]
+    queue = sort_queue(queue)
+    while queue:
+        row = queue.pop()
+        children = [(row[0] + 1, t.id) for t in table[row[1]]["task"].direct_children]
+        children = sort_queue(children)
+        queue += children
+        if table[row[1]]["task"].archived == False:
+            print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
+
+
+@click.command()
+@click.argument("task")
+def delete(task):
+    if task.isnumeric():
+        task = Task.get_by_id(int(task))
+    else:
+        task = Task.get_by_uuid(uuid.UUID(task))
+    task.delete_instance()
+    print(f"Deleting task {task.id} '{task.name}'.")
+    Task.reindex()
+
+
+@click.command()
+def normalize():
+    parents = {None: 1}
+    count = 0
+
+    for parent in Task.select():
+        if Task.select().where(Task.parent == parent).count() > 2:
+            parents[parent] = 1
+    for parent in parents:
+        tasks = Task.select().where(Task.parent == parent)
+        divider = [task.divider for task in tasks]
+        gcd = math.gcd(*divider)
+        if gcd > 1:
+            for task in tasks:
+                task.divider /= gcd
+            Task.bulk_update(tasks, [Task.divider])
+            count += len(tasks)
+    print(f"Modified {count} tasks.")
+
+
+@click.command()
+def status():
+    if Interval.get_or_none(Interval.end == None):
+        print(get_status())
+    else:
+        print("There is no active time tracking.")
+
+
+@click.command()
+@click.argument("task")
+def done(task):
+    if task.isnumeric():
+        task = Task.get_by_id(int(task))
+    else:
+        task = Task.get_by_uuid(uuid.UUID(task))
+    interval = Interval.get_or_none((Interval.end == None) & (Interval.task == task))
+    if interval:
+        print(get_status("Recorded"))
+        interval.end = dt.datetime.now()
+        interval.save()
+    if task.recurrence:
+        task.scheduled = (dt.datetime.now() + dt.timedelta(days=task.recurrence)).date()
+        if task.deadline and task.scheduled > task.deadline:
+            task.archived = True
+            task.scheduled = dt.datetime.now()
+    else:
+        task.archived = True
+    task.save()
+    print(f"Completed task {task.id} '{task.name}'.")
+
+
+cli.add_command(add)
+cli.add_command(modify)
+cli.add_command(start)
+cli.add_command(stop)
+cli.add_command(tree)
+cli.add_command(delete)
+cli.add_command(normalize)
+cli.add_command(status)
+cli.add_command(done)
 
 
 def main():
@@ -40,326 +428,7 @@ def main():
             )
             interval = Interval.create(task=interval.task, start=next_day_datetime)
         interval.save()
-
-    parser = argparse.ArgumentParser(description="To-do list.")
-    subparsers = parser.add_subparsers(help="sub-command help", dest="command")
-    task_ids = [t.id for t in Task.select()]
-    # add
-    add_parser = subparsers.add_parser("add", help="add task")
-    add_parser.add_argument("name", help="name of the task")
-    # edit
-    edit_parser = subparsers.add_parser("edit", help="edit the task")
-    edit_parser.add_argument(
-        "id", help="id of the task", type=int, choices=[t.id for t in Task.select()]
-    )
-    edit_parser.add_argument("-n", "--name", help="name of the task")
-    # edit & add
-    for p in [add_parser, edit_parser]:
-        p.add_argument(
-            "-r", "--recurrence", help="set the recurrence interval", type=int
-        )
-        p.add_argument(
-            "-s",
-            "--scheduled",
-            help="the date when you plan to start working on that task. Example: 2022-10-13",
-        )
-
-        p.add_argument(
-            "-d",
-            "--deadline",
-            help="the date when you plan to finish working on that task. Example: 2022-10-23",
-        )
-        p.add_argument(
-            "-p",
-            "--parent",
-            help="id of the parent task",
-            type=int,
-            choices=task_ids,
-        )
-    # start
-    start_parser: argparse.ArgumentParser = subparsers.add_parser(
-        "start", help="start tasks"
-    )
-    start_parser.add_argument(
-        "id",
-        help="id of the task",
-        type=int,
-        choices=task_ids,
-    )
-    # stop
-    stop_parser: argparse.ArgumentParser = subparsers.add_parser(
-        "stop", help="stop a task"
-    )
-    # del
-    del_parser = subparsers.add_parser("del", help="delete tasks")
-    del_parser.add_argument(
-        "ids",
-        help="ids of tasks",
-        type=int,
-        nargs="+",
-        choices=task_ids,
-    )
-    # done
-    done_parser = subparsers.add_parser("done", help="complete tasks")
-    done_parser.add_argument(
-        "ids",
-        help="ids of tasks",
-        type=int,
-        nargs="+",
-        choices=task_ids,
-    )
-    # tree
-    tree_parser = subparsers.add_parser("tree", help="print tasks as tree")
-    tree_parser.add_argument(
-        "-t",
-        "--today",
-        help="show only today tasks",
-        action="store_true",
-    )
-    tree_parser.add_argument(
-        "-s",
-        "--hide_scheduled",
-        help="hide tasks with scheduled",
-        action="store_true",
-    )
-    # status
-    status_parser = subparsers.add_parser("status", help="print current interval")
-    # elo
-    elo_parser = subparsers.add_parser("elo", help="set rating of task by elo")
-    elo_parser.add_argument("-c", "--count", help="game count", type=int)
-    # ...
-    args = parser.parse_args()
-    match args.command:
-        case "add":
-            task = Task.create(
-                name=args.name,
-                recurrence=args.recurrence,
-                scheduled=str_to_date(args.scheduled, "scheduled", parser),
-                deadline=str_to_date(args.deadline, "deadline", parser),
-                parent=Task.get_by_id(args.parent) if args.parent else None,
-            )
-        case "edit":
-            scheduled = str_to_date(args.scheduled, "scheduled", parser)
-            deadline = str_to_date(args.deadline, "deadline", parser)
-            parent = Task.get_by_id(args.parent) if args.parent else None
-            task = Task.get_by_id(args.id)
-            task.name = args.name if args.name else task.name
-            task.recurrence = args.recurrence if args.recurrence else task.recurrence
-            task.scheduled = scheduled if scheduled else task.scheduled
-            task.deadline = deadline if deadline else task.deadline
-            task.parent = parent if parent else task.parent
-            task.save()
-        case "start":
-            interval = Interval.get_or_none(Interval.end == None)
-            task = Task.get_by_id(args.id)
-            if not interval:
-                Interval.create(task=task)
-            else:
-                print("You need to stop the previous task before starting a new one.")
-            print(f"Start {task.name}")
-        case "stop":
-            print(get_status("Task stopped ", True))
-            task = stop()
-        case "tree":
-
-            def row_to_str(key, row):
-                rating = f'({row["task"].rating}) '
-                scheduled = row["task"].scheduled
-                scheduled = (
-                    colored(f" scheduled:", "magenta") + str(scheduled)
-                    if scheduled
-                    else ""
-                )
-                deadline = row["task"].deadline
-                deadline = (
-                    colored(f" deadline:", "red") + str(deadline) if deadline else ""
-                )
-                recurrence = row["task"].recurrence
-                recurrence = (
-                    colored(f" recurrence:", "yellow") + str(recurrence) + "d"
-                    if recurrence
-                    else ""
-                )
-                duration = (
-                    colored(f" duration:", "green") + f"{round(row['duration']/60)}"
-                )
-                days = colored(f" days:", "blue") + f"{row['days']}"
-                avg = colored(f" avg:", "cyan") + f"{round(row['avg']/60)}"
-                score = colored(f" score:", "yellow") + f"{round(row['score']/60)}"
-                return f'{rating}{key} {row["task"].name}{scheduled}{recurrence}{deadline}{duration}{days}{avg}{score}'
-
-            def sort_queue(queue):
-                if args.hide_scheduled:
-                    queue = list(
-                        filter(lambda x: table[x[1]]["task"].scheduled == None, queue)
-                    )
-                elo = [table[x[1]]["task"].rating for x in queue]
-                for x in queue:
-                    task = table[x[1]]["task"]
-                    table[x[1]]["score"] = table[x[1]]["duration"] / (
-                        task.rating / 1000
-                    )
-                tasks = [table[x[1]]["task"] for x in queue]
-                if args.today:
-                    queue = sorted(
-                        queue, key=lambda x: table[x[1]]["task"].rating, reverse=False
-                    )
-                else:
-                    queue = sorted(
-                        queue, key=lambda x: table[x[1]]["score"], reverse=True
-                    )
-                return queue
-
-            table = {}
-            for task in Task.select():
-                table[task.id] = {
-                    "task": task,
-                    "duration": 0,
-                    "days": set(),
-                    "avg": 0,
-                    "score": 0,
-                }
-            for interval in Interval.select():
-                duration = interval.duration
-                date = str(interval.start.date())
-                for task in interval.task.parents + [interval.task]:
-                    if task.id in table:
-                        table[task.id]["days"].add(date)
-                        table[task.id]["duration"] += duration
-            for key in table:
-                table[key]["days"] = len(table[key]["days"])
-                if table[key]["days"]:
-                    table[key]["avg"] = table[key]["duration"] / table[key]["days"]
-                else:
-                    table[key]["avg"] = 0
-            table = dict(sorted(table.items(), key=lambda tag: tag[1]["score"]))
-            if args.today:
-                table = dict(
-                    sorted(
-                        table.items(),
-                        key=lambda tag: tag[1]["task"].scheduled
-                        if tag[1]["task"].scheduled != None
-                        else dt.date.max,
-                    )
-                )
-                queue = [
-                    (0, task_id)
-                    for task_id in table
-                    if table[task_id]["task"].scheduled == dt.date.today()
-                ]
-            else:
-                queue = [
-                    (0, task_id)
-                    for task_id in table
-                    if table[task_id]["task"].parent == None
-                ]
-            queue = sort_queue(queue)
-            while queue:
-                row = queue.pop()
-                children = [
-                    (row[0] + 1, t.id) for t in table[row[1]]["task"].direct_children
-                ]
-                children = sort_queue(children)
-                queue += children
-                if table[row[1]]["task"].archived == False:
-                    print(" " * 4 * row[0], row_to_str(row[1], table[row[1]]), sep="")
-        case "del":
-            tasks = Task.select().where(Task.id << args.ids)
-            for task in tasks:
-                q = Interval.delete().where(Interval.task == task)
-                q.execute()
-            q = Task.delete().where(Task.id << args.ids)
-            q.execute()
-
-        case "done":
-            tasks = Task.select().where(Task.id << args.ids)
-            for task in tasks:
-                if task.recurrence:
-                    task.scheduled = (
-                        dt.datetime.now() + dt.timedelta(days=task.recurrence)
-                    ).date()
-                    if task.deadline and task.scheduled > task.deadline:
-                        task.archived = True
-                        task.scheduled = dt.datetime.now()
-                else:
-                    task.archived = True
-                task.save()
-            print(get_status("Task done ", True))
-            task = stop()
-        case "status":
-            print(get_status())
-        case "elo":
-
-            def get_expected_score(r_a, r_b):
-                return 1 / (1 + 10 ** ((r_a - r_b) / 400))
-
-            def get_new_rating(r_a, r_b, score):
-                return r_a + 32 * (score - get_expected_score(r_a, r_b))
-
-            args.count = 1 if not args.count else args.count
-            for _ in range(args.count):
-                count = 0
-                task: Task
-                while count < 2:
-                    tasks = list(Task.select())
-                    task = random.choice(tasks)
-                    count = Task.select().where(Task.parent == task.parent).count()
-
-                tasks = Task.select().where(Task.parent == task.parent)
-
-                task_a = random.choice(tasks)
-                task_b = random.choice(tasks)
-                while task_a == task_b:
-                    task_b = random.choice(tasks)
-                a = task_a.rating
-                b = task_b.rating
-                raw_score = ""
-                while raw_score not in ["1", "2", "="]:
-                    raw_score = input(
-                        f'Which task is more important:\n"{task_a.name} (1)" vs "{task_b.name} (2)" (= for equal): '
-                    )
-                match raw_score:
-                    case "1":
-                        score = 1
-                    case "2":
-                        score = 0
-                    case _:
-                        score = 0.5
-                task_a.rating = get_new_rating(a, b, score)
-                task_b.rating = get_new_rating(b, a, 1 - score)
-                print(
-                    f"{task_a.name} ({task_a.rating}), {task_b.name} ({task_b.rating})"
-                )
-                task_a.save()
-                task_b.save()
-
-        case _:
-            print("-" * 10 + "Week" + "-" * 10)
-            need = 40
-            have = 0
-            today = dt.date.today()
-            start_date = today - dt.timedelta(days=today.weekday())
-            for interval in Interval.select():
-                if interval.start.date() >= start_date:
-                    have += interval.duration / 60 / 60
-            have = round(have * 100) / 100
-            if have == 0:
-                print("have/need:", f"{have}/{need}={round(0)*100}")
-            else:
-                print("have/need:", f"{have}/{need}={round((have/need)*10000)/100}%")
-            print("last", f"{need}-{have}={need-have}")
-            print("-" * 10 + "Day" + "-" * 10)
-            need = 10
-            have = 0
-            for interval in Interval.select():
-                if interval.start.date() >= today:
-                    have += interval.duration / 60 / 60
-            have = round(have * 100) / 100
-            if have == 0:
-                print("have/need:", f"{have}/{need}={round(0)*100}")
-            else:
-                print("have/need:", f"{have}/{need}={round((have/need)*10000)/100}%")
-            print("last", f"{need}-{have}={need-have}")
+    cli()
 
 
 if __name__ == "__main__":

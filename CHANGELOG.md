@@ -3,7 +3,9 @@
 ## [Unreleased]
 ### Added
 - Add status command.
-- Add elo command.
+- Add normalize command.
+### Changed
+- Replace "click" with "argparse".
 ### Fixed
 - Archived task with parent task do not break the "tree" command
 

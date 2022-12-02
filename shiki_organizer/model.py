@@ -1,4 +1,5 @@
 import datetime as dt
+import uuid as uuid_module
 
 from peewee import (
     BooleanField,
@@ -9,6 +10,7 @@ from peewee import (
     Model,
     SqliteDatabase,
     TextField,
+    UUIDField,
 )
 
 from shiki_organizer.utilities import get_user_data_dir
@@ -24,13 +26,37 @@ class BaseModel(Model):
 
 
 class Task(BaseModel):
-    rating = IntegerField(default=1000)
+    uuid = UUIDField(primary_key=True, default=uuid_module.uuid4)
+    id = IntegerField(null=True)
+    created = DateTimeField(default=dt.datetime.now())
+    priority = IntegerField(default=0)
+    divider = IntegerField(default=1)
     name = TextField()
     recurrence = IntegerField(null=True)
     scheduled = DateField(null=True)
     deadline = DateField(null=True)
     archived = BooleanField(default=False)
     parent = ForeignKeyField("self", on_delete="CASCADE", null=True)
+
+    @staticmethod
+    def get_by_uuid(uuid):
+        return Task.get(Task.uuid == uuid)
+
+    @staticmethod
+    def get_by_id(id):
+        return Task.get(Task.id == id)
+
+    @staticmethod
+    def reindex():
+        tasks = Task.select().order_by(Task.created)
+        i = 0
+        for task in tasks:
+            if not task.archived:
+                task.id = i + 1
+                i += 1
+            else:
+                task.id = None
+        Task.bulk_update(tasks, [Task.id])
 
     @property
     def parents(self):
@@ -57,9 +83,22 @@ class Task(BaseModel):
 
 
 class Interval(BaseModel):
+    uuid = UUIDField(primary_key=True, default=uuid_module.uuid4)
+    id = IntegerField(null=True)
+    task = ForeignKeyField(Task, on_delete="CASCADE", null=True)
+    description = TextField(null=True)
     start = DateTimeField(default=dt.datetime.now)
     end = DateTimeField(null=True)
-    task = ForeignKeyField(Task, on_delete="CASCADE")
+
+
+    @staticmethod
+    def reindex():
+        intervals = Interval.select().order_by(Interval.start.desc())
+        i = 0
+        for interval in intervals:
+            interval.id = i + 1
+            i += 1
+        Interval.bulk_update(intervals, [Interval.id])
 
     @property
     def duration(self):
