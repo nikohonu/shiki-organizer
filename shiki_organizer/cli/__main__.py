@@ -375,6 +375,9 @@ def interval_delete(interval):
     "-t", "--today", is_flag=True, default=False, help="Show only today tasks."
 )
 @click.option(
+    "-a", "--archived", is_flag=True, default=False, help="Show archived task."
+)
+@click.option(
     "-p",
     "--project",
     is_flag=False,
@@ -385,8 +388,9 @@ def interval_delete(interval):
 @click.option(
     "--tag", type=str, is_flag=False, flag_value="", help="Filter tasks by tag."
 )
-def ls(today, project, tag):
+def ls(today, project, tag, archived):
     def task_to_str(task):
+        id = task.id if task.id else f"uuid:{task.uuid}"
         if task.priority:
             priority = f"{Fore.BLUE}({task.priority}){Style.RESET_ALL} "
         else:
@@ -416,7 +420,7 @@ def ls(today, project, tag):
             if task.tags
             else ""
         )
-        return f"{task.id} {priority}{task.description}{scheduled}{recurrence}{deadline}{project} {tags}"
+        return f"{id} {priority}{task.description}{scheduled}{recurrence}{deadline}{project} {tags}"
 
     tasks = None
     if project:
@@ -439,6 +443,9 @@ def ls(today, project, tag):
         tasks = tasks.where(Task.scheduled == dt.date.today())
     tasks = sorted(tasks, key=lambda x: x.priority if x.priority else "a")
     tasks = sorted(tasks, key=lambda x: x.scheduled if x.scheduled else dt.date.max)
+    
+    if not archived:
+        tasks = filter(lambda x: not x.archived,  tasks)
     for task in tasks:
         print(task_to_str(task))
 

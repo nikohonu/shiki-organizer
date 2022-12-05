@@ -3,6 +3,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Option for show or hide archived tasks.
 
 ## [0.5.0] - 2022-12-05
 
