@@ -1,12 +1,14 @@
 import datetime as dt
+import os
 import string
 import uuid
 
 import click
 from colorama import Fore, Style
+from github import Github
 
 from shiki_organizer.actions import get_status
-from shiki_organizer.model import Interval, Project, Tag, Task
+from shiki_organizer.model import Interval, Issue, Project, Repository, Tag, Task
 
 
 @click.group()
@@ -263,7 +265,8 @@ def status():
 
 @click.command()
 @click.argument("task")
-def done(task):
+@click.option("--github-token", default=lambda: os.environ.get("GITHUB_TOKEN", ""))
+def done(task, github_token):
     if task.isnumeric():
         task = Task.get_by_id(int(task))
     else:
@@ -282,6 +285,18 @@ def done(task):
         task.archived = True
     task.save()
     print(f"Completed task {task.id} '{task.description}'.")
+    issue = Issue.get_or_none(Issue.task == task)
+    if issue:
+        if not github_token:
+            print("GitHub token is required.")
+            return
+        g = Github(github_token)
+        repo = g.get_repo(issue.repository.name)
+        open_issues = repo.get_issues(state="open")
+        for i in open_issues:
+            if issue.number == i.number:
+                i.edit(state="closed")
+    print(f"Close issue {task.id} '{task.description}'.")
 
 
 @click.command()
@@ -443,9 +458,9 @@ def ls(today, project, tag, archived):
         tasks = tasks.where(Task.scheduled == dt.date.today())
     tasks = sorted(tasks, key=lambda x: x.priority if x.priority else "a")
     tasks = sorted(tasks, key=lambda x: x.scheduled if x.scheduled else dt.date.max)
-    
+
     if not archived:
-        tasks = filter(lambda x: not x.archived,  tasks)
+        tasks = filter(lambda x: not x.archived, tasks)
     for task in tasks:
         print(task_to_str(task))
 
@@ -502,6 +517,84 @@ def today():
     print(f"{round(global_duration / 60 / 60 * 100) / 100}h")
 
 
+@click.command()
+@click.argument("name")
+@click.option(
+    "-t",
+    "--tag",
+    help="Tag of the project.",
+    prompt=True,
+    type=str,
+)
+@click.option(
+    "-p",
+    "--project",
+    help="Project of the project.",
+    prompt=True,
+    type=str,
+)
+def repository_add(name, project, tag):
+    project, _ = Project.get_or_create(name=project)
+    tag, _ = Tag.get_or_create(name=tag)
+    repository = Repository.create(name=name, project=project, tag=tag)
+    print(f"Added repository {repository.name}.")
+
+
+@click.command()
+def repository_ls():
+    for repository in Repository.select():
+        print(
+            repository.id,
+            repository.name,
+            f"project:{repository.project.name}",
+            f"+{repository.tag.name}",
+        )
+
+
+@click.command()
+@click.argument("id", type=int)
+def repository_delete(id):
+    repository = Repository.get_or_none(id)
+    repository.delete_instance()
+
+
+@click.command()
+@click.option(
+    "--github-token", default=lambda: os.environ.get("GITHUB_TOKEN", ""), required=True
+)
+def repository_pull(github_token):
+    def process_issue(issues, repository, is_closed=False):
+        for i in issues:
+            issue, _ = Issue.get_or_create(number=i.number, repository=repository)
+            issue.title = i.title
+            if not issue.task:
+                task = Task.create(
+                    description=issue.title,
+                )
+                issue.task = task
+            task = issue.task
+            task.description = f"{issue.title} #{issue.number}"
+            task.project = repository.project
+            task.tags.clear()
+            task.tags.add([repository.tag])
+            task.archived = is_closed
+            task.save()
+            issue.save()
+            Task.reindex()
+
+    if not github_token:
+        print("GitHub token is required.")
+        return
+    g = Github(github_token)
+
+    for repository in Repository.select():
+        repo = g.get_repo(repository.name)
+        open_issues = repo.get_issues(state="open")
+        closed_issues = repo.get_issues(state="closed")
+        process_issue(open_issues, repository)
+        process_issue(closed_issues, repository, True)
+
+
 cli.add_command(add)
 cli.add_command(modify)
 cli.add_command(delete)
@@ -516,6 +609,10 @@ cli.add_command(ls)
 cli.add_command(tags)
 cli.add_command(projects)
 cli.add_command(today)
+cli.add_command(repository_add)
+cli.add_command(repository_ls)
+cli.add_command(repository_delete)
+cli.add_command(repository_pull)
 
 
 def main():

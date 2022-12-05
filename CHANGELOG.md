@@ -5,6 +5,13 @@
 ## [Unreleased]
 ### Added
 - Option for show or hide archived tasks.
+- pygithub dependency.
+- repository-add command.
+- repository-ls command.
+- repository-delete command.
+- repository-pull command.
+- done command can close issue.
+
 
 ## [0.5.0] - 2022-12-05
 

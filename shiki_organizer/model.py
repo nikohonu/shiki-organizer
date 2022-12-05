@@ -117,5 +117,17 @@ class Interval(BaseModel):
             return (dt.datetime.now() - self.start).total_seconds()
 
 
+class Repository(BaseModel):
+    name = TextField()
+    project = ForeignKeyField(Project, null=True, backref="repositories")
+    tag = ForeignKeyField(Tag, null=True, backref="repositories")
+
+class Issue(BaseModel):
+    number = IntegerField(null=False)
+    repository = ForeignKeyField(Repository, backref="issues")
+    task = ForeignKeyField(Task, backref="issue", null=True)
+    title = TextField(null=True)
+
+
 models = BaseModel.__subclasses__() + [TaskTag]
 database.create_tables(models)
