@@ -47,7 +47,10 @@ class Task(BaseModel):
 
     @property
     def average(self):
-        return self.duration / self.days
+        if self.days:
+            return self.duration / self.days
+        else:
+            return 0
 
     @staticmethod
     def get_by_uuid(uuid):

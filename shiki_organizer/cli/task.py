@@ -159,20 +159,6 @@ def modify(task, description, priority, recurrence, scheduled, deadline, tags, p
         deadline = None
     else:
         deadline = deadline.date()
-    if len(tags) == 0:
-        pass
-    elif len(tags) == 1 and tags[0] == "":
-        task.tags.clear()
-    else:
-        task.tags.clear()
-        tags = [tag for tag, _ in [Tag.get_or_create(name=tag) for tag in tags]]
-        task.tags.add(tags)
-    if project == None:
-        project = task.project
-    elif project == "":
-        project = None
-    else:
-        project, _ = Project.get_or_create(name=project)
     q = task.update(
         description=description,
         priority=priority,
@@ -182,8 +168,6 @@ def modify(task, description, priority, recurrence, scheduled, deadline, tags, p
         project=project,
     ).where(Task.id == task.id)
     q.execute()
-    Project.remove_unused()
-    Tag.remove_unused()
     print(f"Modifying task {task.id} '{task.description}'.")
 
 
@@ -197,8 +181,6 @@ def delete(task):
     task.tags.clear()
     Interval.delete().where(Interval.task == task).execute()
     task.delete_instance()
-    Project.remove_unused()
-    Tag.remove_unused()
     print(f"Deleting task {task.id} '{task.description}'.")
 
 
@@ -316,24 +298,17 @@ def done(task, github_token):
 @click.option(
     "-a", "--archived", is_flag=True, default=False, help="Show archived task."
 )
-@click.option(
-    "-p",
-    "--project",
-    is_flag=False,
-    flag_value="",
-    type=str,
-    help="Filter tasks by project.",
-)
-@click.option(
-    "--tag", type=str, is_flag=False, flag_value="", help="Filter tasks by tag."
-)
-def ls(today, project, tag, archived):
+def ls(today, archived):
     def task_to_str(task):
         id = task.id if task.id else f"uuid:{task.uuid}"
         if task.priority:
             priority = f"{Fore.BLUE}({task.priority}){Style.RESET_ALL} "
         else:
             priority = ""
+        if task.divider > 1:
+            divider = f"{Fore.RED}({task.divider}){Style.RESET_ALL} "
+        else:
+            divider = ""
         scheduled = (
             f" {Fore.MAGENTA}scheduled:{Style.RESET_ALL}" + str(task.scheduled)
             if task.scheduled
@@ -349,37 +324,20 @@ def ls(today, project, tag, archived):
             if task.recurrence
             else ""
         )
-        project = (
-            f" {Fore.CYAN}project:{Style.RESET_ALL}{task.project.name}"
-            if task.project
+        duration = (
+            f" {Fore.GREEN}duration:{Style.RESET_ALL}{task.duration}d"
+            if task.duration
             else ""
         )
-        tags = (
-            " ".join([f"{Fore.GREEN}+{tag.name}{Style.RESET_ALL}" for tag in task.tags])
-            if task.tags
-            else ""
-        )
-        return f"{id} {priority}{task.description}{scheduled}{recurrence}{deadline}{project} {tags}"
+        return f"{id} {priority}{divider}{task.description}{scheduled}{recurrence}{deadline}{duration}"
 
     tasks = None
-    if project:
-        tasks = Task.select().join(Project).where(Project.name == project)
-    if project == "":
-        tasks = Task.select().where(Task.project == None)
-    if tag != None:
-        tag = None if not tag else tag
-        tasks = []
-        for task in Task.select():
-            tag_nams = [tag.name for tag in task.tags]
-            if tag:
-                if tag in tag_nams:
-                    tasks.append(task)
-            elif len(tag_nams) == 0:
-                tasks.append(task)
     if not tasks:
         tasks = Task.select()
     if today:
         tasks = tasks.where(Task.scheduled == dt.date.today())
+    else:
+        tasks = Task.select()
     tasks = sorted(tasks, key=lambda x: x.priority if x.priority else "a")
     tasks = sorted(tasks, key=lambda x: x.scheduled if x.scheduled else dt.date.max)
 
