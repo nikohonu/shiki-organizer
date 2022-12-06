@@ -18,7 +18,9 @@ pygithub = "^1.57"
 
 [tool.poetry.scripts]
 shiki-organizer = "shiki_organizer.gui.__main__:main"
-so = "shiki_organizer.cli.__main__:main"
+so = "shiki_organizer.cli.task:main"
+so-interval = "shiki_organizer.cli.interval:main"
+so-repository = "shiki_organizer.cli.repository:main"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.10.0"

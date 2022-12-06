@@ -298,84 +298,6 @@ def done(task, github_token):
                 i.edit(state="closed")
     print(f"Close issue {task.id} '{task.description}'.")
 
-
-@click.command()
-@click.option("-u/-n", "--uuid/--no-uuid", default=False, help="Show only today tasks")
-def interval_list(uuid):
-    for interval in Interval.select():
-        if uuid:
-            uuid = f"{Fore.CYAN}uuid:{Style.RESET_ALL}{interval.uuid} "
-        else:
-            uuid = ""
-        id = f"{Fore.RED}id:{Style.RESET_ALL}{interval.id} "
-        if interval.task:
-            task = f"{Fore.YELLOW}task:{Style.RESET_ALL}'{interval.task.description}' "
-        else:
-            task = ""
-        start = f"{Fore.BLUE}start:{Style.RESET_ALL}'{interval.start}' "
-        if interval.end:
-            end = f"{Fore.MAGENTA}end:{Style.RESET_ALL}'{interval.end}'"
-        else:
-            end = ""
-        print(f"{uuid}{id}{task}{start}{end}")
-
-
-@click.command()
-@click.argument("interval")
-@click.option(
-    "-t",
-    "--task",
-    is_flag=False,
-    flag_value="",
-    help="Id or uuid of the parent task.",
-    type=str,
-)
-@click.option(
-    "-s",
-    "--start",
-    type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
-    help="Start of the interval",
-)
-@click.option(
-    "-e",
-    "--end",
-    is_flag=False,
-    flag_value="0001-01-01T00:00:00",
-    type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
-    help="End of the interval",
-)
-def interval_modify(interval, task, start, end):
-    if interval.isnumeric():
-        interval = Interval.get_by_id(int(interval))
-    else:
-        interval = Interval.get_by_uuid(uuid.UUID(interval))
-    if task == None:
-        task = interval.task
-    elif task == "":
-        task = None
-    else:
-        if task.isnumeric():
-            task = Task.get_by_id(int(task))
-        else:
-            task = Task.get_by_uuid(uuid.UUID(task))
-    if start == None:
-        start = interval.start
-    if end == None:
-        end = interval.end
-    elif end == dt.datetime.min:
-        end = None
-    q = interval.update(
-        task=task,
-        start=start,
-        end=end,
-    ).where(Interval.id == interval.id)
-    q.execute()
-    print(f"Modifying interval {interval.id}'.")
-
-
-@click.command()
-@click.argument("interval")
-def interval_delete(interval):
     if interval.isnumeric():
         interval = Interval.get_by_id(int(interval))
     else:
@@ -516,53 +438,6 @@ def today():
             global_duration += interval.duration
     print(f"{round(global_duration / 60 / 60 * 100) / 100}h")
 
-
-@click.command()
-@click.argument("name")
-@click.option(
-    "-t",
-    "--tag",
-    help="Tag of the project.",
-    prompt=True,
-    type=str,
-)
-@click.option(
-    "-p",
-    "--project",
-    help="Project of the project.",
-    prompt=True,
-    type=str,
-)
-def repository_add(name, project, tag):
-    project, _ = Project.get_or_create(name=project)
-    tag, _ = Tag.get_or_create(name=tag)
-    repository = Repository.create(name=name, project=project, tag=tag)
-    print(f"Added repository {repository.name}.")
-
-
-@click.command()
-def repository_ls():
-    for repository in Repository.select():
-        print(
-            repository.id,
-            repository.name,
-            f"project:{repository.project.name}",
-            f"+{repository.tag.name}",
-        )
-
-
-@click.command()
-@click.argument("id", type=int)
-def repository_delete(id):
-    repository = Repository.get_or_none(id)
-    repository.delete_instance()
-
-
-@click.command()
-@click.option(
-    "--github-token", default=lambda: os.environ.get("GITHUB_TOKEN", ""), required=True
-)
-def repository_pull(github_token):
     def process_issue(issues, repository, is_closed=False):
         for i in issues:
             issue, _ = Issue.get_or_create(number=i.number, repository=repository)
@@ -602,17 +477,10 @@ cli.add_command(start)
 cli.add_command(stop)
 cli.add_command(status)
 cli.add_command(done)
-cli.add_command(interval_list)
-cli.add_command(interval_modify)
-cli.add_command(interval_delete)
 cli.add_command(ls)
 cli.add_command(tags)
 cli.add_command(projects)
 cli.add_command(today)
-cli.add_command(repository_add)
-cli.add_command(repository_ls)
-cli.add_command(repository_delete)
-cli.add_command(repository_pull)
 
 
 def main():

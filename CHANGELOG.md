@@ -11,6 +11,7 @@
 - repository-delete command.
 - repository-pull command.
 - done command can close issue.
+- split commands by different entry points.
 
 
 ## [0.5.0] - 2022-12-05
