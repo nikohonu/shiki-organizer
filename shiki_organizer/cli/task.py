@@ -8,7 +8,7 @@ from colorama import Fore, Style
 from github import Github
 
 from shiki_organizer.actions import get_status
-from shiki_organizer.model import Interval, Issue, Project, Repository, Tag, Task
+from shiki_organizer.model import Interval, Issue, Repository, Task
 
 
 @click.group()
@@ -25,6 +25,13 @@ def cli():
     type=click.Choice(list(string.ascii_uppercase)),
 )
 @click.option(
+    "-d",
+    "--divider",
+    default=1,
+    help="Divider of the task.",
+    type=click.IntRange(1),
+)
+@click.option(
     "-r",
     "--recurrence",
     help="Recurrence interval of the task.",
@@ -39,7 +46,6 @@ def cli():
     type=click.DateTime(formats=["%Y-%m-%d"]),
 )
 @click.option(
-    "-d",
     "--deadline",
     is_flag=False,
     flag_value=str(dt.date.today()),
@@ -47,29 +53,25 @@ def cli():
     type=click.DateTime(formats=["%Y-%m-%d"]),
 )
 @click.option(
-    "-t",
-    "--tags",
-    multiple=True,
-    help="Tags of the task.",
+    "--parent",
+    help="Id or uuid of the parent task.",
     type=str,
 )
-@click.option(
-    "--project",
-    help="Project of the task.",
-    type=str,
-)
-def add(description, priority, recurrence, scheduled, deadline, tags, project):
-    project, _ = Project.get_or_create(name=project) if project else (None, None)
-    tags = [tag for tag, _ in [Tag.get_or_create(name=tag) for tag in tags]]
+def add(description, priority, divider, recurrence, scheduled, deadline, parent):
+    if parent:
+        if parent.isnumeric():
+            parent = Task.get_by_id(int(parent))
+        else:
+            parent = uuid.UUID(parent)
     task = Task.create(
         description=description,
         priority=priority,
+        divider=divider,
         recurrence=recurrence,
         scheduled=scheduled.date() if scheduled else None,
         deadline=deadline.date() if deadline else None,
-        project=project,
+        parent=parent,
     )
-    task.tags.add(tags)
     Task.reindex()
     task = Task.get_by_uuid(task.uuid)
     print(f"Created task {task.id}.")

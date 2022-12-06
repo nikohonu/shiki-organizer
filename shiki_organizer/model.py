@@ -26,40 +26,28 @@ class BaseModel(Model):
         database = database
 
 
-class Project(BaseModel):
-    name = TextField()
-
-    @staticmethod
-    def remove_unused():
-        tasks = Task.select()
-        for project in Project.select():
-            if tasks.where(Task.project == project).count() == 0:
-                project.delete_instance()
-
-
-class Tag(BaseModel):
-    name = TextField()
-
-    @staticmethod
-    def remove_unused():
-        tasks = TaskTag.select()
-        for tag in Tag.select():
-            if tasks.where(TaskTag.tag == tag).count() == 0:
-                tag.delete_instance()
-
-
 class Task(BaseModel):
     uuid = UUIDField(primary_key=True, default=uuid_module.uuid4)
     id = IntegerField(null=True)
     created = DateTimeField(default=dt.datetime.now())
     priority = TextField(null=True)
+    divider = IntegerField(default=1)
+    duration = IntegerField(null=True)
+    days = IntegerField(null=True)
     description = TextField()
     recurrence = IntegerField(null=True)
     scheduled = DateField(null=True)
     deadline = DateField(null=True)
     archived = BooleanField(default=False)
-    project = ForeignKeyField(Project, null=True, backref="tasks")
-    tags = ManyToManyField(Tag, backref="tasks")
+    parent = ForeignKeyField("self", on_delete="CASCADE", null=True)
+
+    @property
+    def score(self):
+        return self.duration / self.divider
+
+    @property
+    def average(self):
+        return self.duration / self.days
 
     @staticmethod
     def get_by_uuid(uuid):
@@ -80,9 +68,6 @@ class Task(BaseModel):
             else:
                 task.id = None
         Task.bulk_update(tasks, [Task.id])
-
-
-TaskTag = Task.tags.get_through_model()
 
 
 class Interval(BaseModel):
@@ -119,8 +104,7 @@ class Interval(BaseModel):
 
 class Repository(BaseModel):
     name = TextField()
-    project = ForeignKeyField(Project, null=True, backref="repositories")
-    tag = ForeignKeyField(Tag, null=True, backref="repositories")
+
 
 class Issue(BaseModel):
     number = IntegerField(null=False)
@@ -129,5 +113,5 @@ class Issue(BaseModel):
     title = TextField(null=True)
 
 
-models = BaseModel.__subclasses__() + [TaskTag]
+models = BaseModel.__subclasses__()
 database.create_tables(models)
