@@ -280,15 +280,7 @@ def done(task, github_token):
         for i in open_issues:
             if issue.number == i.number:
                 i.edit(state="closed")
-    print(f"Close issue {task.id} '{task.description}'.")
-
-    if interval.isnumeric():
-        interval = Interval.get_by_id(int(interval))
-    else:
-        interval = Interval.get_by_uuid(uuid.UUID(interval))
-    interval.delete_instance()
-    print(f"Deleting interval {interval.id}.")
-    Interval.reindex()
+        print(f"Close issue {task.id} '{task.description}'.")
 
 
 @click.command(name="ls")
