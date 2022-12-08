@@ -8,7 +8,7 @@ from colorama import Fore, Style
 from github import Github
 
 from shiki_organizer.actions import get_status
-from shiki_organizer.model import Interval, Issue, Repository, Task
+from shiki_organizer.model import Interval, Issue, Task
 
 
 @click.group()
@@ -126,14 +126,28 @@ def add(description, priority, divider, recurrence, scheduled, deadline, parent)
 )
 @click.option(
     "--parent",
+    is_flag=False,
+    flag_value="",
     help="Id or uuid of the parent task.",
     type=str,
 )
-def modify(task, description, priority, divider, recurrence, scheduled, deadline, parent):
+def modify(
+    task, description, priority, divider, recurrence, scheduled, deadline, parent
+):
     if task.isnumeric():
         task = Task.get_by_id(int(task))
     else:
         task = Task.get_by_uuid(uuid.UUID(task))
+    if parent:
+        if parent.isnumeric():
+            parent = Task.get_by_id(int(parent))
+        else:
+            parent = uuid.UUID(parent)
+    elif parent == "":
+        parent = None
+    else:
+        parent = task.parent
+
     description = task.description if description == None else description
     if priority == None:
         priority = task.priority
@@ -281,6 +295,53 @@ def done(task, github_token):
         print(f"Close issue {task.id} '{task.description}'.")
 
 
+# def update(task: Task):
+def update():
+    query = Task.update(duration=0)
+    query.execute()
+    intervals = Interval.select()
+    tasks = {}
+    for interval in intervals:
+        task = interval.task
+        while task:
+            if task not in tasks:
+                tasks[task] = set([interval.start.date()])
+            else:
+                tasks[task].add(interval.start.date())
+            task.duration += interval.duration
+            task = task.parent
+    for task in tasks:
+        task.days = len(tasks[task])
+    Task.bulk_update(tasks.keys(), fields=[Task.duration, Task.days])
+
+
+def task_to_str(task):
+    def get_value(value, name, color):
+        return f" {color}{name}:{Style.RESET_ALL}" + str(value) if value else ""
+
+    id = task.id if task.id else f"uuid:{task.uuid}"
+    if task.priority:
+        priority = f"{Fore.BLUE}({task.priority}){Style.RESET_ALL} "
+    else:
+        priority = ""
+    if task.divider > 1:
+        divider = f"{Fore.RED}({task.divider}){Style.RESET_ALL} "
+    else:
+        divider = ""
+    scheduled = get_value(task.scheduled, "scheduled", Fore.MAGENTA)
+    deadline = get_value(task.deadline, "deadline", Fore.RED)
+    recurrence = (
+        f" {Fore.YELLOW}recurrence:{Style.RESET_ALL}{task.recurrence}d"
+        if task.recurrence
+        else ""
+    )
+    duration = get_value(int(task.duration / 60), "duration", Fore.GREEN)
+    days = get_value(task.days, "days", Fore.BLUE)
+    score = get_value(int(task.score / 60), "score", Fore.RED)
+    average = get_value(int(task.average / 60), "average", Fore.CYAN)
+    return f"{id} {priority}{divider}{task.description}{scheduled}{recurrence}{deadline}{duration}{days}{average}{score}"
+
+
 @click.command(name="ls")
 @click.option(
     "-t", "--today", is_flag=True, default=False, help="Show only today tasks."
@@ -289,47 +350,16 @@ def done(task, github_token):
     "-a", "--archived", is_flag=True, default=False, help="Show archived task."
 )
 def ls(today, archived):
-    def task_to_str(task):
-        id = task.id if task.id else f"uuid:{task.uuid}"
-        if task.priority:
-            priority = f"{Fore.BLUE}({task.priority}){Style.RESET_ALL} "
-        else:
-            priority = ""
-        if task.divider > 1:
-            divider = f"{Fore.RED}({task.divider}){Style.RESET_ALL} "
-        else:
-            divider = ""
-        scheduled = (
-            f" {Fore.MAGENTA}scheduled:{Style.RESET_ALL}" + str(task.scheduled)
-            if task.scheduled
-            else ""
-        )
-        deadline = (
-            f" {Fore.RED}deadline:{Style.RESET_ALL}" + str(task.deadline)
-            if task.deadline
-            else ""
-        )
-        recurrence = (
-            f" {Fore.YELLOW}recurrence:{Style.RESET_ALL}{task.recurrence}d"
-            if task.recurrence
-            else ""
-        )
-        duration = (
-            f" {Fore.GREEN}duration:{Style.RESET_ALL}{task.duration}d"
-            if task.duration
-            else ""
-        )
-        return f"{id} {priority}{divider}{task.description}{scheduled}{recurrence}{deadline}{duration}"
 
     tasks = None
     if not tasks:
         tasks = Task.select()
     if today:
         tasks = tasks.where(Task.scheduled == dt.date.today())
+        tasks = sorted(tasks, key=lambda x: x.priority if x.priority else "a")
+        tasks = sorted(tasks, key=lambda x: x.scheduled if x.scheduled else dt.date.max)
     else:
-        tasks = Task.select()
-    tasks = sorted(tasks, key=lambda x: x.priority if x.priority else "a")
-    tasks = sorted(tasks, key=lambda x: x.scheduled if x.scheduled else dt.date.max)
+        tasks = sorted(Task.select(), key=lambda x: x.score)
 
     if not archived:
         tasks = filter(lambda x: not x.archived, tasks)
@@ -345,36 +375,31 @@ def today():
             global_duration += interval.duration
     print(f"{round(global_duration / 60 / 60 * 100) / 100}h")
 
-    def process_issue(issues, repository, is_closed=False):
-        for i in issues:
-            issue, _ = Issue.get_or_create(number=i.number, repository=repository)
-            issue.title = i.title
-            if not issue.task:
-                task = Task.create(
-                    description=issue.title,
+
+@click.command()
+def tree():
+    update()
+    queue = [
+        (0, task)
+        for task in sorted(
+            Task.select().where(Task.parent == None),
+            key=lambda x: x.score,
+            reverse=True,
+        )
+    ]
+    while queue:
+        item = queue.pop()
+        if not item[1].archived:
+            queue += [
+                (item[0] + 1, task)
+                for task in sorted(
+                    Task.select().where(Task.parent == item[1]),
+                    key=lambda x: x.score,
+                    reverse=True,
                 )
-                issue.task = task
-            task = issue.task
-            task.description = f"{issue.title} #{issue.number}"
-            task.project = repository.project
-            task.tags.clear()
-            task.tags.add([repository.tag])
-            task.archived = is_closed
-            task.save()
-            issue.save()
-            Task.reindex()
-
-    if not github_token:
-        print("GitHub token is required.")
-        return
-    g = Github(github_token)
-
-    for repository in Repository.select():
-        repo = g.get_repo(repository.name)
-        open_issues = repo.get_issues(state="open")
-        closed_issues = repo.get_issues(state="closed")
-        process_issue(open_issues, repository)
-        process_issue(closed_issues, repository, True)
+            ]
+            space = "\t"
+            print(f"{space * item[0]}{task_to_str(item[1])}")
 
 
 cli.add_command(add)
@@ -385,6 +410,7 @@ cli.add_command(stop)
 cli.add_command(status)
 cli.add_command(done)
 cli.add_command(ls)
+cli.add_command(tree)
 cli.add_command(today)
 
 

@@ -8,7 +8,7 @@ from colorama import Fore, Style
 from github import Github
 
 from shiki_organizer.actions import get_status
-from shiki_organizer.model import Interval, Issue, Project, Repository, Tag, Task
+from shiki_organizer.model import Interval, Issue, Repository, Task
 
 
 @click.group()
@@ -19,23 +19,18 @@ def cli():
 @click.command()
 @click.argument("name")
 @click.option(
-    "-t",
-    "--tag",
-    help="Tag of the project.",
-    prompt=True,
-    type=str,
-)
-@click.option(
     "-p",
-    "--project",
-    help="Project of the project.",
-    prompt=True,
+    "--parent",
+    help="Id or uuid of the parent task.",
     type=str,
 )
-def add(name, project, tag):
-    project, _ = Project.get_or_create(name=project)
-    tag, _ = Tag.get_or_create(name=tag)
-    repository = Repository.create(name=name, project=project, tag=tag)
+def add(name, parent):
+    if parent.isnumeric():
+        parent = Task.get_by_id(int(parent))
+    else:
+        parent = Task.get_by_uuid(uuid.UUID(parent))
+    repository = Repository.create(name=name, parent=parent)
+    Repository.reindex()
     print(f"Added repository {repository.name}.")
 
 
@@ -45,8 +40,7 @@ def ls():
         print(
             repository.id,
             repository.name,
-            f"project:{repository.project.name}",
-            f"+{repository.tag.name}",
+            f"parent:{repository.task.description}",
         )
 
 
@@ -64,7 +58,7 @@ def delete(id):
 def pull(github_token):
     def process_issue(issues, repository, is_closed=False):
         for i in issues:
-            issue, _ = Issue.get_or_create(number=i.number, repository=repository)
+            issue, _ = Issue.get_or_create(id=i.number, repository=repository)
             issue.title = i.title
             if not issue.task:
                 task = Task.create(
@@ -72,10 +66,8 @@ def pull(github_token):
                 )
                 issue.task = task
             task = issue.task
-            task.description = f"{issue.title} #{issue.number}"
-            task.project = repository.project
-            task.tags.clear()
-            task.tags.add([repository.tag])
+            task.description = f"{issue.title} #{issue.id}"
+            task.parent = repository.parent
             task.archived = is_closed
             task.save()
             issue.save()

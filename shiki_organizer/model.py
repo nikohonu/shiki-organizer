@@ -7,7 +7,6 @@ from peewee import (
     DateTimeField,
     ForeignKeyField,
     IntegerField,
-    ManyToManyField,
     Model,
     SqliteDatabase,
     TextField,
@@ -106,14 +105,28 @@ class Interval(BaseModel):
 
 
 class Repository(BaseModel):
+    uuid = UUIDField(primary_key=True, default=uuid_module.uuid4)
+    id = IntegerField(null=True)
+    created = DateTimeField(default=dt.datetime.now())
     name = TextField()
+    parent = ForeignKeyField(Task, null=False, backref="repositories")
+
+    @staticmethod
+    def reindex():
+        repositories = Repository.select().order_by(Repository.created.desc())
+        i = 0
+        for repository in repositories:
+            repository.id = i + 1
+            i += 1
+        Repository.bulk_update(repositories, [Task.id])
 
 
 class Issue(BaseModel):
-    number = IntegerField(null=False)
+    uuid = UUIDField(primary_key=True, default=uuid_module.uuid4)
     repository = ForeignKeyField(Repository, backref="issues")
+    id = IntegerField(null=False)
+    name = TextField(null=True)
     task = ForeignKeyField(Task, backref="issue", null=True)
-    title = TextField(null=True)
 
 
 models = BaseModel.__subclasses__()

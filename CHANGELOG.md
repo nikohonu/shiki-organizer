@@ -10,6 +10,7 @@
 - repository-ls command.
 - repository-delete command.
 - repository-pull command.
+- tree command.
 - done command can close issue.
 - split commands by different entry points.
 
