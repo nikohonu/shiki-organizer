@@ -338,49 +338,6 @@ def ls(today, archived):
 
 
 @click.command()
-def tags():
-    tags = {}
-    global_duration = 0
-    for interval in Interval.select():
-        for tag in interval.task.tags:
-            duration = interval.duration
-            if tag in tags:
-                tags[tag] += duration
-            else:
-                tags[tag] = duration
-            global_duration += duration
-    tags = sorted(tags.items(), key=lambda x: x[1], reverse=True)
-    for tag, duration in tags:
-        print(
-            tag.name,
-            round(duration / 60 * 100) / 100,
-            f"{round(duration / global_duration * 10000)/100}%",
-        )
-
-
-@click.command()
-def projects():
-    projects = {}
-    global_duration = 0
-    for interval in Interval.select():
-        duration = interval.duration
-        project = interval.task.project
-        if project:
-            if project in projects:
-                projects[project] += duration
-            else:
-                projects[project] = duration
-            global_duration += duration
-    projects = sorted(projects.items(), key=lambda x: x[1], reverse=True)
-    for project, duration in projects:
-        print(
-            project.name,
-            round(duration / 60 * 100) / 100,
-            f"{round(duration / global_duration * 10000)/100}%",
-        )
-
-
-@click.command()
 def today():
     global_duration = 0
     for interval in Interval.select():
@@ -428,8 +385,6 @@ cli.add_command(stop)
 cli.add_command(status)
 cli.add_command(done)
 cli.add_command(ls)
-cli.add_command(tags)
-cli.add_command(projects)
 cli.add_command(today)
 
 

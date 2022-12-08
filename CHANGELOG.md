@@ -16,6 +16,10 @@
 ### Changed
 - return the ability to set a parent for a task (for add command).
 
+### Removed
+
+- projects command.
+- tags command.
 
 ## [0.5.0] - 2022-12-05
 
