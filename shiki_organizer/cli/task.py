@@ -290,7 +290,7 @@ def done(task, github_token):
         repo = g.get_repo(issue.repository.name)
         open_issues = repo.get_issues(state="open")
         for i in open_issues:
-            if issue.number == i.number:
+            if issue.id == i.number:
                 i.edit(state="closed")
         print(f"Close issue {task.id} '{task.description}'.")
 
@@ -300,19 +300,25 @@ def update():
     query = Task.update(duration=0)
     query.execute()
     intervals = Interval.select()
-    tasks = {}
+    items = {}
     for interval in intervals:
         task = interval.task
         while task:
-            if task not in tasks:
-                tasks[task] = set([interval.start.date()])
+            if task.id not in items:
+                items[task.id] = {"task": task, "duration": 0, "days": 0}
+                items[task.id]["duration"] = interval.duration
+                items[task.id]["days"] = set([interval.start.date()])
             else:
-                tasks[task].add(interval.start.date())
-            task.duration += interval.duration
+                items[task.id]["duration"] += interval.duration
+                items[task.id]["days"].add(interval.start.date())
             task = task.parent
-    for task in tasks:
-        task.days = len(tasks[task])
-    Task.bulk_update(tasks.keys(), fields=[Task.duration, Task.days])
+    tasks = []
+    for item in items:
+        task = items[item]["task"]
+        task.days = len(items[item]["days"])
+        task.duration = items[item]["duration"]
+        tasks.append(task)
+    Task.bulk_update(tasks, fields=[Task.duration, Task.days])
 
 
 def task_to_str(task):
