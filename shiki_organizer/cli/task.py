@@ -94,6 +94,14 @@ def add(description, priority, divider, recurrence, scheduled, deadline, parent)
     type=click.Choice(list(string.ascii_uppercase) + [""]),
 )
 @click.option(
+    "-d",
+    "--divider",
+    is_flag=False,
+    flag_value=1,
+    help="Divider of the task.",
+    type=click.IntRange(1),
+)
+@click.option(
     "-r",
     "--recurrence",
     is_flag=False,
@@ -110,7 +118,6 @@ def add(description, priority, divider, recurrence, scheduled, deadline, parent)
     type=click.DateTime(formats=["%Y-%m-%d"]),
 )
 @click.option(
-    "-d",
     "--deadline",
     is_flag=False,
     flag_value="0001-01-01",
@@ -118,22 +125,11 @@ def add(description, priority, divider, recurrence, scheduled, deadline, parent)
     type=click.DateTime(formats=["%Y-%m-%d"]),
 )
 @click.option(
-    "-t",
-    "--tags",
-    is_flag=False,
-    flag_value="",
-    multiple=True,
-    help="Tags of the task.",
+    "--parent",
+    help="Id or uuid of the parent task.",
     type=str,
 )
-@click.option(
-    "--project",
-    is_flag=False,
-    flag_value="",
-    help="Project of the task.",
-    type=str,
-)
-def modify(task, description, priority, recurrence, scheduled, deadline, tags, project):
+def modify(task, description, priority, divider, recurrence, scheduled, deadline, parent):
     if task.isnumeric():
         task = Task.get_by_id(int(task))
     else:
@@ -143,6 +139,8 @@ def modify(task, description, priority, recurrence, scheduled, deadline, tags, p
         priority = task.priority
     elif priority == "":
         priority = None
+    if divider == None:
+        divider = task.divider
     if recurrence == None:
         recurrence = task.recurrence
     elif recurrence == 0:
@@ -162,10 +160,11 @@ def modify(task, description, priority, recurrence, scheduled, deadline, tags, p
     q = task.update(
         description=description,
         priority=priority,
+        divider=divider,
         recurrence=recurrence,
         scheduled=scheduled,
         deadline=deadline,
-        project=project,
+        parent=parent,
     ).where(Task.id == task.id)
     q.execute()
     print(f"Modifying task {task.id} '{task.description}'.")
@@ -178,7 +177,6 @@ def delete(task):
         task = Task.get_by_id(int(task))
     else:
         task = Task.get_by_uuid(uuid.UUID(task))
-    task.tags.clear()
     Interval.delete().where(Interval.task == task).execute()
     task.delete_instance()
     print(f"Deleting task {task.id} '{task.description}'.")
