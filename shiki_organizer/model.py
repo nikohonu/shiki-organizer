@@ -117,6 +117,14 @@ class Repository(BaseModel):
     parent = ForeignKeyField(Task, null=False, backref="repositories")
 
     @staticmethod
+    def get_by_uuid(uuid):
+        return Repository.get(Repository.uuid == uuid)
+
+    @staticmethod
+    def get_by_id(id):
+        return Repository.get(Repository.id == id)
+
+    @staticmethod
     def reindex():
         repositories = Repository.select().order_by(Repository.created.desc())
         i = 0

@@ -35,12 +35,54 @@ def add(name, parent):
 
 
 @click.command()
+@click.argument("repository")
+@click.option(
+    "-n",
+    "--name",
+    help="Name of the repository on GitHub in format 'user/projects'.",
+    type=str,
+)
+@click.option(
+    "-p",
+    "--parent",
+    is_flag=False,
+    flag_value="",
+    help="Id or uuid of the parent task.",
+    type=str,
+)
+def modify(repository, name, parent):
+    if repository.isnumeric():
+        repository = Repository.get_by_id(int(repository))
+    else:
+        repository = Repository.get_by_uuid(uuid.UUID(repository))
+    if parent:
+        if parent.isnumeric():
+            parent = Task.get_by_id(int(parent))
+        else:
+            parent = uuid.UUID(parent)
+    elif parent == "":
+        parent = None
+    else:
+        parent = repository.parent
+    name = repository.name if name == None else name
+    q = Repository.update(
+        name=name,
+        parent=parent,
+    ).where(Repository.id == repository.id)
+    q.execute()
+    print(f"Modifying repository {repository.id} '{name}'.")
+
+
+@click.command()
 def ls():
     for repository in Repository.select():
+        parent_id = (
+            repository.parent.id if repository.parent.id else repository.parent.uuid
+        )
         print(
             repository.id,
             repository.name,
-            f"parent:{repository.task.description}",
+            f"parent:{parent_id} {repository.parent.description}",
         )
 
 
@@ -90,6 +132,7 @@ cli.add_command(add)
 cli.add_command(ls)
 cli.add_command(delete)
 cli.add_command(pull)
+cli.add_command(modify)
 
 
 def main():
