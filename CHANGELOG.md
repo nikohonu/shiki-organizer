@@ -13,6 +13,7 @@
 - tree command.
 - done command can close issue.
 - split commands by different entry points.
+- today option for tree command.
 
 ### Changed
 - return the ability to set a parent for a task (for add command).

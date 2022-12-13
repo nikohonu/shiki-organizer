@@ -307,9 +307,14 @@ def update():
             if task.id not in items:
                 items[task.id] = {"task": task, "duration": 0, "days": 0}
                 items[task.id]["duration"] = interval.duration
+                items[task.id]["today_duration"] = 0
+                if interval.start.date() == dt.date.today():
+                    items[task.id]["today_duration"] = interval.duration
                 items[task.id]["days"] = set([interval.start.date()])
             else:
                 items[task.id]["duration"] += interval.duration
+                if interval.start.date() == dt.date.today():
+                    items[task.id]["today_duration"] += interval.duration
                 items[task.id]["days"].add(interval.start.date())
             task = task.parent
     tasks = []
@@ -317,8 +322,9 @@ def update():
         task = items[item]["task"]
         task.days = len(items[item]["days"])
         task.duration = items[item]["duration"]
+        task.today_duration = items[item]["today_duration"]
         tasks.append(task)
-    Task.bulk_update(tasks, fields=[Task.duration, Task.days])
+    Task.bulk_update(tasks, fields=[Task.duration, Task.today_duration, Task.days])
 
 
 def task_to_str(task):
@@ -342,10 +348,14 @@ def task_to_str(task):
         else ""
     )
     duration = get_value(int(task.duration / 60), "duration", Fore.GREEN)
+    today_duration = get_value(
+        int(task.today_duration / 60), "t-duration", Fore.MAGENTA
+    )
     days = get_value(task.days, "days", Fore.BLUE)
     score = get_value(int(task.score / 60), "score", Fore.RED)
+    today_score = get_value(int(task.today_duration / 60), "t-score", Fore.RED)
     average = get_value(int(task.average / 60), "average", Fore.CYAN)
-    return f"{id} {priority}{divider}{task.description}{scheduled}{recurrence}{deadline}{duration}{days}{average}{score}"
+    return f"{id} {priority}{divider}{task.description}{scheduled}{recurrence}{deadline}{duration}{today_duration}{days}{average}{score}{today_score}"
 
 
 @click.command(name="ls")
@@ -383,27 +393,40 @@ def today():
 
 
 @click.command()
-def tree():
+@click.option(
+    "-t", "--today", is_flag=True, default=False, help="Show only today tasks."
+)
+def tree(today):
     update()
-    queue = [
-        (0, task)
-        for task in sorted(
+    if today:
+        tasks = sorted(
+            Task.select().where(Task.parent == None),
+            key=lambda x: x.today_score,
+            reverse=True,
+        )
+    else:
+        tasks = sorted(
             Task.select().where(Task.parent == None),
             key=lambda x: x.score,
             reverse=True,
         )
-    ]
+    queue = [(0, task) for task in tasks]
     while queue:
         item = queue.pop()
         if not item[1].archived:
-            queue += [
-                (item[0] + 1, task)
-                for task in sorted(
+            if today:
+                tasks = sorted(
+                    Task.select().where(Task.parent == item[1]),
+                    key=lambda x: x.today_score,
+                    reverse=True,
+                )
+            else:
+                tasks = sorted(
                     Task.select().where(Task.parent == item[1]),
                     key=lambda x: x.score,
                     reverse=True,
                 )
-            ]
+            queue += [(item[0] + 1, task) for task in tasks]
             space = "\t"
             print(f"{space * item[0]}{task_to_str(item[1])}")
 

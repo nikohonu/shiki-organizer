@@ -31,7 +31,8 @@ class Task(BaseModel):
     created = DateTimeField(default=dt.datetime.now())
     priority = TextField(null=True)
     divider = IntegerField(default=1)
-    duration = IntegerField(null=True)
+    duration = IntegerField(default=0)
+    today_duration = IntegerField(default=0)
     days = IntegerField(null=True)
     description = TextField()
     recurrence = IntegerField(null=True)
@@ -43,6 +44,10 @@ class Task(BaseModel):
     @property
     def score(self):
         return self.duration / self.divider
+
+    @property
+    def today_score(self):
+        return self.today_duration / self.divider
 
     @property
     def average(self):
