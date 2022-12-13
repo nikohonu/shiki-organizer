@@ -101,14 +101,13 @@ def pull(github_token):
     def process_issue(issues, repository, is_closed=False):
         for i in issues:
             issue, _ = Issue.get_or_create(id=i.number, repository=repository)
-            issue.title = i.title
             if not issue.task:
                 task = Task.create(
-                    description=issue.title,
+                    description=i.title,
                 )
                 issue.task = task
             task = issue.task
-            task.description = f"{issue.title} #{issue.id}"
+            task.description = f"{i.title} #{issue.id}"
             task.parent = repository.parent
             task.archived = is_closed
             task.save()

@@ -138,7 +138,6 @@ class Issue(BaseModel):
     uuid = UUIDField(primary_key=True, default=uuid_module.uuid4)
     repository = ForeignKeyField(Repository, backref="issues")
     id = IntegerField(null=False)
-    name = TextField(null=True)
     task = ForeignKeyField(Task, backref="issue", null=True)
 
 
