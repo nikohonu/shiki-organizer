@@ -5,6 +5,7 @@
 ## [Unreleased]
 ### Added
 - so-repository modify command.
+- so-repository pull command show info about its own work.
 
 ### Fixed
 
