@@ -2,7 +2,7 @@
 
 # Changelog
 
-## [Unreleased]
+## [0.6.0] - 2022-12-13
 ### Added
 - Option for show or hide archived tasks.
 - pygithub dependency.
