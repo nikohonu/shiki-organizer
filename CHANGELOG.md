@@ -7,6 +7,9 @@
 - so-repository modify command.
 - so-repository pull command show info about its own work.
 
+### Changed
+- reverse tree sorting by score
+
 ### Fixed
 
 - so-repository ls command.

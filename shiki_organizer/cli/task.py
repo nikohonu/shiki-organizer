@@ -398,17 +398,18 @@ def today():
 )
 def tree(today):
     update()
+    reverse = False
     if today:
         tasks = sorted(
             Task.select().where(Task.parent == None),
             key=lambda x: x.today_score,
-            reverse=True,
+            reverse=reverse,
         )
     else:
         tasks = sorted(
             Task.select().where(Task.parent == None),
             key=lambda x: x.score,
-            reverse=True,
+            reverse=reverse,
         )
     queue = [(0, task) for task in tasks]
     while queue:
@@ -418,13 +419,13 @@ def tree(today):
                 tasks = sorted(
                     Task.select().where(Task.parent == item[1]),
                     key=lambda x: x.today_score,
-                    reverse=True,
+                    reverse=reverse,
                 )
             else:
                 tasks = sorted(
                     Task.select().where(Task.parent == item[1]),
                     key=lambda x: x.score,
-                    reverse=True,
+                    reverse=reverse,
                 )
             queue += [(item[0] + 1, task) for task in tasks]
             space = "\t"
