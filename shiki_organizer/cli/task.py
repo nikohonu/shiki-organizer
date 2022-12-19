@@ -9,6 +9,7 @@ from github import Github
 
 from shiki_organizer.actions import get_status
 from shiki_organizer.model import Interval, Issue, Task
+import shiki_organizer.actions as actions
 
 
 @click.group()
@@ -212,43 +213,12 @@ def delete(task):
     help="End of the interval",
 )
 def start(task, start, end):
-    if task.isnumeric():
-        task = Task.get_by_id(int(task))
-    else:
-        task = Task.get_by_uuid(uuid.UUID(task))
-    interval = Interval.get_or_none(Interval.end == None)
-    if interval:
-        if interval.task == task:
-            print(get_status())
-            return
-        else:
-            now = dt.datetime.now()
-            interval.end = dt.datetime(
-                now.year, now.month, now.day, now.hour, now.minute, now.second
-            )
-            interval.save()
-            print(get_status("Recorded"))
-    if end and end < start:
-        end = None
-        print("The end of the interval must be after the start.")
-        return
-    Interval.create(task=task, start=start, end=end)
-    print(get_status())
-    Interval.reindex()
+    actions.start(task, start, end)
 
 
 @click.command()
 def stop():
-    interval = Interval.get_or_none(Interval.end == None)
-    if interval:
-        print(get_status("Recorded"))
-        now = dt.datetime.now()
-        interval.end = dt.datetime(
-            now.year, now.month, now.day, now.hour, now.minute, now.second
-        )
-        interval.save()
-    else:
-        print("There is no active time tracking.")
+    actions.stop()
 
 
 @click.command()
@@ -263,36 +233,7 @@ def status():
 @click.argument("task")
 @click.option("--github-token", default=lambda: os.environ.get("GITHUB_TOKEN", ""))
 def done(task, github_token):
-    if task.isnumeric():
-        task = Task.get_by_id(int(task))
-    else:
-        task = Task.get_by_uuid(uuid.UUID(task))
-    interval = Interval.get_or_none((Interval.end == None) & (Interval.task == task))
-    if interval:
-        print(get_status("Recorded"))
-        interval.end = dt.datetime.now()
-        interval.save()
-    if task.recurrence:
-        task.scheduled = (dt.datetime.now() + dt.timedelta(days=task.recurrence)).date()
-        if task.deadline and task.scheduled > task.deadline:
-            task.archived = True
-            task.scheduled = dt.datetime.now()
-    else:
-        task.archived = True
-    task.save()
-    print(f"Completed task {task.id} '{task.description}'.")
-    issue = Issue.get_or_none(Issue.task == task)
-    if issue:
-        if not github_token:
-            print("GitHub token is required.")
-            return
-        g = Github(github_token)
-        repo = g.get_repo(issue.repository.name)
-        open_issues = repo.get_issues(state="open")
-        for i in open_issues:
-            if issue.id == i.number:
-                i.edit(state="closed")
-        print(f"Close issue {task.id} '{task.description}'.")
+    actions.done([task], github_token)
 
 
 # def update(task: Task):

@@ -6,6 +6,8 @@
 ### Added
 - so-repository modify command.
 - so-repository pull command show info about its own work.
+- basic gui.
+- start, stop, done commands for gui.
 
 ### Changed
 - reverse tree sorting by score
