@@ -54,6 +54,7 @@ def start(task: str, start, end):
     print(get_status())
     Interval.reindex()
 
+
 def get_current_task():
     interval = Interval.get_or_none(Interval.end == None)
     if interval:
@@ -84,6 +85,10 @@ def done(tasks: list, github_token):
             task.archived = True
         task.save()
         print(f"Completed task {task.id} '{task.description}'.")
+        if not task.archived:
+            print(
+                f"Reschedule task {task.id} '{task.description}' to {task.scheduled}."
+            )
         issue = Issue.get_or_none(Issue.task == task)
         if issue:
             if not github_token:
@@ -96,6 +101,7 @@ def done(tasks: list, github_token):
                 if issue.id == i.number:
                     i.edit(state="closed")
             print(f"Close issue {task.id} '{task.description}'.")
+
 
 def stop():
     interval = Interval.get_or_none(Interval.end == None)

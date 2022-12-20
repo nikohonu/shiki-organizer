@@ -8,6 +8,7 @@
 - so-repository pull command show info about its own work.
 - basic gui.
 - start, stop, done commands for gui.
+- show new scheduled date when user complete recurring tasks.
 
 ### Changed
 - reverse tree sorting by score
