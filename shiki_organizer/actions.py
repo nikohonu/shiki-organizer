@@ -61,7 +61,22 @@ def get_current_task():
         return interval.task
 
 
-def done(tasks: list, github_token):
+def close_issue(task: Task, github_token: str):
+    issue = Issue.get_or_none(Issue.task == task)
+    if issue:
+        if not github_token:
+            print("GitHub token is required.")
+            return
+        g = Github(github_token)
+        repo = g.get_repo(issue.repository.name)
+        open_issues = repo.get_issues(state="open")
+        for i in open_issues:
+            if issue.id == i.number:
+                i.edit(state="closed")
+        print(f"Close issue {task.id} '{task.description}'.")
+
+
+def done(tasks: list, github_token: str):
     for task in tasks:
         if task.isnumeric():
             task = Task.get_by_id(int(task))
@@ -89,18 +104,7 @@ def done(tasks: list, github_token):
             print(
                 f"Reschedule task {task.id} '{task.description}' to {task.scheduled}."
             )
-        issue = Issue.get_or_none(Issue.task == task)
-        if issue:
-            if not github_token:
-                print("GitHub token is required.")
-                return
-            g = Github(github_token)
-            repo = g.get_repo(issue.repository.name)
-            open_issues = repo.get_issues(state="open")
-            for i in open_issues:
-                if issue.id == i.number:
-                    i.edit(state="closed")
-            print(f"Close issue {task.id} '{task.description}'.")
+        close_issue(task, github_token)
 
 
 def stop():
