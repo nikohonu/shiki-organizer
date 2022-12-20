@@ -1,25 +1,21 @@
-# from datetime import date, datetime, timedelta
-
 import os
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
 from PySide6.QtGui import QBrush, QColor
 
-# from PySide6.QtWidgets import QLabel
-
-# from shiki_organizer.commands.stop_command import run_stop_command
 from shiki_organizer.model import Task
 import shiki_organizer.actions as actions
 import datetime as dt
 
 
 class TaskTableModel(QAbstractTableModel):
-    def __init__(self, parent=None, today=False):
+    def __init__(self, today=True, parent=None):
         super().__init__(parent)
-
-        self._tasks = [
-            task for task in Task.select().where(Task.scheduled <= dt.date.today())
-        ]
+        self.today = today
+        tasks = Task.select().where(Task.archived == False)
+        if self.today:
+            tasks = tasks.where(Task.scheduled <= dt.date.today())
+        self._tasks = [task for task in tasks]
         self._headers = ["ID", "Name", "Recurrence", "Due"]
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int):
@@ -51,9 +47,10 @@ class TaskTableModel(QAbstractTableModel):
         return 4
 
     def refresh(self):
-        self._tasks = [
-            task for task in Task.select().where(Task.scheduled <= dt.date.today())
-        ]
+        tasks = Task.select().where(Task.archived == False)
+        if self.today:
+            tasks = tasks.where(Task.scheduled <= dt.date.today())
+        self._tasks = [task for task in tasks]
         self.dataChanged.emit(1, 1)
         self.headerDataChanged.emit(Qt.Orientation.Vertical, 1, 1)
 

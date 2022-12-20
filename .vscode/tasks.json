@@ -1,0 +1,27 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "shiki-organizer",
+      "type": "shell",
+      "command": "poetry run shiki-organizer",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "ui",
+      "type": "shell",
+      "command": "pyside6-uic shiki_organizer/gui/ui/main_window.ui -g python -o shiki_organizer/gui/ui/main_window.py; pyside6-uic shiki_organizer/gui/ui/tasks_tab.ui -g python -o shiki_organizer/gui/ui/tasks_tab.py",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
