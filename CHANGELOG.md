@@ -3,7 +3,9 @@
 # Changelog
 
 ## [Unreleased]
+
 ### Added
+
 - so-repository modify command.
 - so-repository pull command show info about its own work.
 - basic gui.
@@ -11,14 +13,18 @@
 - show new scheduled date when user complete recurring tasks.
 
 ### Changed
+
 - reverse tree sorting by score
 
 ### Fixed
 
 - so-repository ls command.
+- so-interval command [#17](https://github.com/nikohonu/shiki-organizer/issues/17).
 
 ## [0.6.0] - 2022-12-13
+
 ### Added
+
 - Option for show or hide archived tasks.
 - pygithub dependency.
 - repository-add command.
@@ -31,6 +37,7 @@
 - today option for tree command.
 
 ### Changed
+
 - return the ability to set a parent for a task (for add command).
 
 ### Removed

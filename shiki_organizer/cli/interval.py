@@ -1,14 +1,10 @@
 import datetime as dt
-import os
-import string
 import uuid
 
 import click
 from colorama import Fore, Style
-from github import Github
 
-from shiki_organizer.actions import get_status
-from shiki_organizer.model import Interval, Issue, Project, Repository, Tag, Task
+from shiki_organizer.model import Interval, Task
 
 
 @click.group()
