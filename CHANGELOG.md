@@ -9,7 +9,7 @@
 - Period, archived, uuid and root option for so tree command.
 - uuid option for so ls
 - Duration in so-interval ls command.
-
+- Period option for so-interval ls command.
 ### Removed
 
 - Divider, today_duration, score, today_score for tasks.

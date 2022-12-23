@@ -2,7 +2,7 @@ from colorama import Fore, Style
 import datetime as dt
 
 
-def _duration_to_str(duration):
+def duration_to_str(duration):
     seconds = int(duration)
     minutes = int(duration / 60)
     hours = int(minutes / 60)
@@ -39,12 +39,12 @@ def task_to_str(task, show_uuid):
     deadline = _get("deadline", task.deadline, Fore.RED)
     recurrence = _get("recurrence", task.recurrence, Fore.RED, unit="d")
     days = _get("days", task.days, Fore.BLUE)
-    average = _get("average", task.average, Fore.CYAN, _duration_to_str(task.average))
+    average = _get("average", task.average, Fore.CYAN, duration_to_str(task.average))
     duration = _get(
         "duration",
         task.duration,
         Fore.GREEN,
-        _duration_to_str(task.duration),
+        duration_to_str(task.duration),
         space_after=False,
     )
     return f"{id}{priority}{task.description} {uuid}{scheduled}{recurrence}{deadline}{days}{average}{duration}"
@@ -60,7 +60,7 @@ def interval_to_str(interval, show_uuid):
         "duration",
         interval.duration,
         Fore.RED,
-        _duration_to_str(interval.duration),
+        duration_to_str(interval.duration),
         space_after=False,
     )
     return f"{uuid}{id}{task}{start}{end}{duration}"
