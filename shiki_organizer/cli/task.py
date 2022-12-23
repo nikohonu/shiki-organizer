@@ -300,7 +300,15 @@ def ls(today, archived, uuid):
 @click.option(
     "-u", "--uuid", is_flag=True, default=False, help="Show uuid of interval."
 )
-def tree(period, archived, uuid):
+@click.option(
+    "-r", "--root", help="Set the root task of tree."
+)
+def tree(period, archived, uuid, root):
+    if root:
+        if root.isnumeric():
+            root = Task.get_by_id(int(root))
+        else:
+            root = Task.get_by_uuid(uuid.UUID(root))
     start = pendulum.now()
     match period:
         case "today":
@@ -318,7 +326,7 @@ def tree(period, archived, uuid):
         start = dt.datetime.fromisoformat(start_string)
     update_tasks(start)
     tasks = sorted(
-        Task.select().where((Task.parent == None)),
+        Task.select().where((Task.parent == root)),
         key=lambda x: x.duration,
     )
     queue = [(0, task) for task in tasks]
