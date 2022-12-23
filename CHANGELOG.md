@@ -4,17 +4,19 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2022-12-23
+
 ### Added
 
 - so-repository modify command.
 - so-repository pull command show info about its own work.
-- basic GUI with "Today" and "Tasks" tabs ([#13](https://github.com/nikohonu/shiki-organizer/issues/13), [#18](https://github.com/nikohonu/shiki-organizer/issues/18)).
-- start, stop, done commands for gui.
-- show new scheduled date when user complete recurring tasks.
+- Basic GUI with "Today" and "Tasks" tabs ([#13](https://github.com/nikohonu/shiki-organizer/issues/13), [#18](https://github.com/nikohonu/shiki-organizer/issues/18)).
+- Start, stop, done commands for gui.
+- Show new scheduled date when user complete recurring tasks.
 
 ### Changed
 
-- reverse tree sorting by score
+- Reverse tree sorting by scor.e
 
 ### Fixed
 
