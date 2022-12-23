@@ -4,8 +4,8 @@ import uuid
 import click
 
 from shiki_organizer.model import Interval, Task
-from shiki_organizer.cli.formatting import (
-    duration_to_str,
+from shiki_organizer.formatter import duration_to_str
+from shiki_organizer.cli.formatter import (
     interval_to_str,
     label_value,
     Fore,

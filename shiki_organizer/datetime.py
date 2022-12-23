@@ -4,7 +4,7 @@ import datetime as dt
 
 def period_to_datetime(period: str):
     start = pendulum.now()
-    match period:
+    match period.lower():
         case "today":
             start = start.start_of("day")
         case "week":

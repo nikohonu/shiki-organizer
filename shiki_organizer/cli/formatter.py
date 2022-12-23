@@ -1,6 +1,8 @@
 from colorama import Fore, Style
 import datetime as dt
 
+from shiki_organizer.formatter import duration_to_str, datetime_to_str
+
 
 def label_value(label, data, color):
     return f"{color}{label}:{Style.RESET_ALL}{data}"
@@ -13,23 +15,13 @@ def label_value_or_none(
         space = " " if space_after else ""
         data = data if data else check
         if type(data) == dt.datetime:
-            data = data.isoformat(" ", "seconds")
+            data = datetime_to_str(data)
         else:
             data = str(data)
         data = data if data.find(" ") == -1 else f"'{data}'"
         return f"{label_value(name, data, color)}{unit}{space}"
     else:
         return ""
-
-
-def duration_to_str(duration):
-    seconds = int(duration)
-    minutes = int(duration / 60)
-    hours = int(minutes / 60)
-    seconds = seconds % 60
-    minutes = minutes % 60
-    hours = f"{hours}h " if hours else ""
-    return f"{hours}{minutes}m {seconds}s"
 
 
 def task_to_str(task, show_uuid):

@@ -10,6 +10,8 @@
 - uuid option for so ls
 - Duration in so-interval ls command.
 - Period option for so-interval ls command.
+- Interval tab in GUI with equivalent of ls and modify commands.
+
 ### Removed
 
 - Divider, today_duration, score, today_score for tasks.
