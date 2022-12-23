@@ -8,8 +8,8 @@ import click
 from shiki_organizer.actions import get_status
 from shiki_organizer.model import Interval, Task
 import shiki_organizer.actions as actions
-import pendulum
-from shiki_organizer.formatting import task_to_str
+from shiki_organizer.cli.formatting import task_to_str
+from shiki_organizer.datetime import period_to_datetime
 
 
 @click.group()
@@ -236,7 +236,7 @@ def done(task, github_token):
     actions.done([task], github_token)
 
 
-def update_tasks(start):
+def _update_tasks(start):
     query = Task.update(duration=0, days=0)
     query.execute()
     intervals = Interval.select().where(Interval.start >= start)
@@ -301,30 +301,17 @@ def ls(today, archived, uuid):
     "-u", "--uuid", is_flag=True, default=False, help="Show uuid of interval."
 )
 @click.option(
-    "-r", "--root", help="Set the root task of tree."
+    "-d", "--duration", is_flag=True, default=False, help="Hide task without duration."
 )
-def tree(period, archived, uuid, root):
+@click.option("-r", "--root", help="Set the root task of tree.")
+def tree(period, archived, uuid, root, duration):
+    start = period_to_datetime(period)
     if root:
         if root.isnumeric():
             root = Task.get_by_id(int(root))
         else:
             root = Task.get_by_uuid(uuid.UUID(root))
-    start = pendulum.now()
-    match period:
-        case "today":
-            start = start.start_of("day")
-        case "week":
-            start = start.start_of("week")
-        case "month":
-            start = start.start_of("month")
-        case "year":
-            start = start.start_of("year")
-        case _:
-            start = dt.datetime.min
-    if start != dt.datetime.min:
-        start_string = start.to_datetime_string()
-        start = dt.datetime.fromisoformat(start_string)
-    update_tasks(start)
+    _update_tasks(start)
     tasks = sorted(
         Task.select().where((Task.parent == root)),
         key=lambda x: x.duration,
@@ -332,6 +319,8 @@ def tree(period, archived, uuid, root):
     queue = [(0, task) for task in tasks]
     while queue:
         item = queue.pop()
+        if duration and item[1].duration == 0:
+            continue
         if item[1].archived == False or archived:
             tasks = sorted(
                 Task.select().where((Task.parent == item[1])),

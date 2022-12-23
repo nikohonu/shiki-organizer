@@ -6,7 +6,7 @@
 
 ### Added
 
-- Period, archived, uuid and root option for so tree command.
+- Period, archived, uuid, root and duration option for so tree command.
 - uuid option for so ls
 - Duration in so-interval ls command.
 - Period option for so-interval ls command.

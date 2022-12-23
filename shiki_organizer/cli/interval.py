@@ -4,9 +4,13 @@ import uuid
 import click
 
 from shiki_organizer.model import Interval, Task
-from shiki_organizer.formatting import duration_to_str, interval_to_str
-import pendulum
-from colorama import Fore, Style
+from shiki_organizer.cli.formatting import (
+    duration_to_str,
+    interval_to_str,
+    label_value,
+    Fore,
+)
+from shiki_organizer.datetime import period_to_datetime
 
 
 @click.group()
@@ -26,29 +30,13 @@ def cli():
     help="Show data only for this period of time.",
 )
 def ls(uuid, period):
-    start = pendulum.now()
-    match period:
-        case "today":
-            start = start.start_of("day")
-        case "week":
-            start = start.start_of("week")
-        case "month":
-            start = start.start_of("month")
-        case "year":
-            start = start.start_of("year")
-        case _:
-            start = dt.datetime.min
-    if start != dt.datetime.min:
-        start_string = start.to_datetime_string()
-        start = dt.datetime.fromisoformat(start_string)
+    start = period_to_datetime(period)
     intervals = Interval.select().where(Interval.start >= start)
     total_duration = 0
     for interval in intervals:
         total_duration += interval.duration
         print(interval_to_str(interval, uuid))
-    print(
-        f"{Fore.MAGENTA}Total duration:{Style.RESET_ALL}{duration_to_str(total_duration)}"
-    )
+    print(label_value("Total duration", duration_to_str(total_duration), Fore.MAGENTA))
 
 
 @click.command()
