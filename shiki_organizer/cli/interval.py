@@ -5,6 +5,7 @@ import click
 from colorama import Fore, Style
 
 from shiki_organizer.model import Interval, Task
+from shiki_organizer.formatting import interval_to_str
 
 
 @click.group()
@@ -13,24 +14,12 @@ def cli():
 
 
 @click.command()
-@click.option("-u/-n", "--uuid/--no-uuid", default=False, help="Show only today tasks")
+@click.option(
+    "-u", "--uuid", is_flag=True, default=False, help="Show uuid of interval."
+)
 def ls(uuid):
     for interval in Interval.select():
-        if uuid:
-            uuid = f"{Fore.CYAN}uuid:{Style.RESET_ALL}{interval.uuid} "
-        else:
-            uuid = ""
-        id = f"{Fore.RED}id:{Style.RESET_ALL}{interval.id} "
-        if interval.task:
-            task = f"{Fore.YELLOW}task:{Style.RESET_ALL}'{interval.task.description}' "
-        else:
-            task = ""
-        start = f"{Fore.BLUE}start:{Style.RESET_ALL}'{interval.start}' "
-        if interval.end:
-            end = f"{Fore.MAGENTA}end:{Style.RESET_ALL}'{interval.end}'"
-        else:
-            end = ""
-        print(f"{uuid}{id}{task}{start}{end}")
+        print(interval_to_str(interval, uuid))
 
 
 @click.command()

@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- Period, archived and uuid option for so tree command.
+- uuid option for so ls
+- Duration in so-interval ls command.
+
+### Removed
+
+- Divider, today_duration, score, today_score for tasks.
+- so today command.
+
 ## [0.7.0] - 2022-12-23
 
 ### Added
@@ -16,7 +27,7 @@
 
 ### Changed
 
-- Reverse tree sorting by scor.e
+- Reverse tree sorting by score.
 
 ### Fixed
 

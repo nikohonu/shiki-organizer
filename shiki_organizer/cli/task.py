@@ -4,12 +4,12 @@ import string
 import uuid
 
 import click
-from colorama import Fore, Style
-from github import Github
 
 from shiki_organizer.actions import get_status
-from shiki_organizer.model import Interval, Issue, Task
+from shiki_organizer.model import Interval, Task
 import shiki_organizer.actions as actions
+import pendulum
+from shiki_organizer.formatting import task_to_str
 
 
 @click.group()
@@ -236,11 +236,10 @@ def done(task, github_token):
     actions.done([task], github_token)
 
 
-# def update(task: Task):
-def update():
-    query = Task.update(duration=0)
+def update_tasks(start):
+    query = Task.update(duration=0, days=0)
     query.execute()
-    intervals = Interval.select()
+    intervals = Interval.select().where(Interval.start >= start)
     items = {}
     for interval in intervals:
         task = interval.task
@@ -248,14 +247,9 @@ def update():
             if task.id not in items:
                 items[task.id] = {"task": task, "duration": 0, "days": 0}
                 items[task.id]["duration"] = interval.duration
-                items[task.id]["today_duration"] = 0
-                if interval.start.date() == dt.date.today():
-                    items[task.id]["today_duration"] = interval.duration
                 items[task.id]["days"] = set([interval.start.date()])
             else:
                 items[task.id]["duration"] += interval.duration
-                if interval.start.date() == dt.date.today():
-                    items[task.id]["today_duration"] += interval.duration
                 items[task.id]["days"].add(interval.start.date())
             task = task.parent
     tasks = []
@@ -263,114 +257,86 @@ def update():
         task = items[item]["task"]
         task.days = len(items[item]["days"])
         task.duration = items[item]["duration"]
-        task.today_duration = items[item]["today_duration"]
         tasks.append(task)
-    Task.bulk_update(tasks, fields=[Task.duration, Task.today_duration, Task.days])
+    Task.bulk_update(tasks, fields=[Task.duration, Task.days])
 
 
-def task_to_str(task):
-    def get_value(value, name, color):
-        return f" {color}{name}:{Style.RESET_ALL}" + str(value) if value else ""
-
-    id = task.id if task.id else f"uuid:{task.uuid}"
-    if task.priority:
-        priority = f"{Fore.BLUE}({task.priority}){Style.RESET_ALL} "
-    else:
-        priority = ""
-    if task.divider > 1:
-        divider = f"{Fore.RED}({task.divider}){Style.RESET_ALL} "
-    else:
-        divider = ""
-    scheduled = get_value(task.scheduled, "scheduled", Fore.MAGENTA)
-    deadline = get_value(task.deadline, "deadline", Fore.RED)
-    recurrence = (
-        f" {Fore.YELLOW}recurrence:{Style.RESET_ALL}{task.recurrence}d"
-        if task.recurrence
-        else ""
-    )
-    duration = get_value(int(task.duration / 60), "duration", Fore.GREEN)
-    today_duration = get_value(
-        int(task.today_duration / 60), "t-duration", Fore.MAGENTA
-    )
-    days = get_value(task.days, "days", Fore.BLUE)
-    score = get_value(int(task.score / 60), "score", Fore.RED)
-    today_score = get_value(int(task.today_duration / 60), "t-score", Fore.RED)
-    average = get_value(int(task.average / 60), "average", Fore.CYAN)
-    return f"{id} {priority}{divider}{task.description}{scheduled}{recurrence}{deadline}{duration}{today_duration}{days}{average}{score}{today_score}"
-
-
-@click.command(name="ls")
+@click.command()
 @click.option(
     "-t", "--today", is_flag=True, default=False, help="Show only today tasks."
 )
 @click.option(
     "-a", "--archived", is_flag=True, default=False, help="Show archived task."
 )
-def ls(today, archived):
-
-    tasks = None
-    if not tasks:
-        tasks = Task.select()
+@click.option(
+    "-u", "--uuid", is_flag=True, default=False, help="Show uuid of interval."
+)
+def ls(today, archived, uuid):
+    tasks = Task.select()
     if today:
-        tasks = tasks.where(Task.scheduled == dt.date.today())
-        tasks = sorted(tasks, key=lambda x: x.priority if x.priority else "a")
-        tasks = sorted(tasks, key=lambda x: x.scheduled if x.scheduled else dt.date.max)
+        tasks = sorted(
+            tasks.where(Task.scheduled <= dt.date.today()),
+            key=lambda x: x.priority if x.priority else "a",
+        )
     else:
-        tasks = sorted(Task.select(), key=lambda x: x.score)
-
+        tasks = sorted(tasks, key=lambda x: x.scheduled if x.scheduled else dt.date.max)
     if not archived:
         tasks = filter(lambda x: not x.archived, tasks)
     for task in tasks:
-        print(task_to_str(task))
-
-
-@click.command()
-def today():
-    global_duration = 0
-    for interval in Interval.select():
-        if interval.start.date() == dt.date.today():
-            global_duration += interval.duration
-    print(f"{round(global_duration / 60 / 60 * 100) / 100}h")
+        print(task_to_str(task, uuid))
 
 
 @click.command()
 @click.option(
-    "-t", "--today", is_flag=True, default=False, help="Show only today tasks."
+    "-p",
+    "--period",
+    type=click.Choice(["all", "today", "week", "month", "year"]),
+    default="all",
+    help="Show data only for this period of time.",
 )
-def tree(today):
-    update()
-    reverse = False
-    if today:
-        tasks = sorted(
-            Task.select().where(Task.parent == None),
-            key=lambda x: x.today_score,
-            reverse=reverse,
-        )
-    else:
-        tasks = sorted(
-            Task.select().where(Task.parent == None),
-            key=lambda x: x.score,
-            reverse=reverse,
-        )
+@click.option(
+    "-a", "--archived", is_flag=True, default=False, help="Show archived task."
+)
+@click.option(
+    "-u", "--uuid", is_flag=True, default=False, help="Show uuid of interval."
+)
+def tree(period, archived, uuid):
+    start = pendulum.now()
+    match period:
+        case "today":
+            start = start.start_of("day")
+        case "week":
+            start = start.start_of("week")
+        case "month":
+            start = start.start_of("month")
+        case "year":
+            start = start.start_of("year")
+        case _:
+            start = dt.datetime.min
+    if start != dt.datetime.min:
+        start_string = start.to_datetime_string()
+        start = dt.datetime.fromisoformat(start_string)
+    update_tasks(start)
+    tasks = sorted(
+        Task.select().where((Task.parent == None)),
+        key=lambda x: x.duration,
+    )
     queue = [(0, task) for task in tasks]
     while queue:
         item = queue.pop()
-        if not item[1].archived:
-            if today:
-                tasks = sorted(
-                    Task.select().where(Task.parent == item[1]),
-                    key=lambda x: x.today_score,
-                    reverse=reverse,
-                )
-            else:
-                tasks = sorted(
-                    Task.select().where(Task.parent == item[1]),
-                    key=lambda x: x.score,
-                    reverse=reverse,
-                )
+        if item[1].archived == False or archived:
+            tasks = sorted(
+                Task.select().where((Task.parent == item[1])),
+                key=lambda x: x.duration,
+            )
             queue += [(item[0] + 1, task) for task in tasks]
             space = "\t"
-            print(f"{space * item[0]}{task_to_str(item[1])}")
+            print(f"{space * item[0]}{task_to_str(item[1], uuid)}")
+
+
+@click.command()
+def reindex():
+    Task.reindex()
 
 
 cli.add_command(add)
@@ -382,7 +348,7 @@ cli.add_command(status)
 cli.add_command(done)
 cli.add_command(ls)
 cli.add_command(tree)
-cli.add_command(today)
+cli.add_command(reindex)
 
 
 def main():

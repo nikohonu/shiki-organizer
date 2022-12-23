@@ -30,9 +30,7 @@ class Task(BaseModel):
     id = IntegerField(null=True)
     created = DateTimeField(default=dt.datetime.now())
     priority = TextField(null=True)
-    divider = IntegerField(default=1)
     duration = IntegerField(default=0)
-    today_duration = IntegerField(default=0)
     days = IntegerField(null=True)
     description = TextField()
     recurrence = IntegerField(null=True)
@@ -40,14 +38,6 @@ class Task(BaseModel):
     deadline = DateField(null=True)
     archived = BooleanField(default=False)
     parent = ForeignKeyField("self", on_delete="CASCADE", null=True)
-
-    @property
-    def score(self):
-        return self.duration / self.divider
-
-    @property
-    def today_score(self):
-        return self.today_duration / self.divider
 
     @property
     def average(self):
