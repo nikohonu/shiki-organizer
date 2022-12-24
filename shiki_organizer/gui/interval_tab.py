@@ -73,9 +73,11 @@ class IntervalModel(QAbstractTableModel):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._start = dt.datetime.min
-        self._intervals = Interval.select().where(Interval.start >= self._start)
-        self._headers = ["ID", "Task description", "Start", "End", "Duration"]
+        self.start = dt.datetime.min
+        self.sort_column = 0
+        self.sort_order = Qt.SortOrder.DescendingOrder
+        self.headers = ["ID", "Task description", "Start", "End", "Duration"]
+        self.refresh()
         self.total_duration_changed.emit(self.get_total_duration())
 
         timer = QTimer(self)
@@ -89,17 +91,17 @@ class IntervalModel(QAbstractTableModel):
         return 5
 
     def rowCount(self, parent: QModelIndex) -> int:
-        return len(self._intervals)
+        return len(self.intervals)
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int):
         if orientation == Qt.Orientation.Horizontal and role == Qt.DisplayRole:
-            return self._headers[section]
+            return self.headers[section]
         return super().headerData(section, orientation, role)
 
     def data(self, index: QModelIndex, role: int):
         if index.isValid():
             if role == Qt.DisplayRole:
-                interval = self._intervals[index.row()]
+                interval = self.intervals[index.row()]
                 match index.column():
                     case 0:
                         return interval.id
@@ -114,18 +116,53 @@ class IntervalModel(QAbstractTableModel):
 
     def get_total_duration(self):
         total_duration = 0
-        for interval in self._intervals:
+        for interval in self.intervals:
             total_duration += interval.duration
         return total_duration
 
     def change_period(self, period):
-        self._start = period_to_datetime(period)
+        self.start = period_to_datetime(period)
         self.refresh()
 
     def refresh(self):
-        self._intervals = Interval.select().where(Interval.start >= self._start)
-        self.dataChanged.emit(1, 1)
-        self.headerDataChanged.emit(Qt.Orientation.Vertical, 1, 1)
+        self.intervals = (
+            Interval.select().join(Task).where(Interval.start >= self.start)
+        )
+        print(self.sort_column, self.sort_order)
+        match self.sort_column:
+            case 0:
+                if self.sort_order == Qt.SortOrder.AscendingOrder:
+                    self.intervals = self.intervals.order_by(Interval.id)
+                else:
+                    self.intervals = self.intervals.order_by(Interval.id.desc())
+            case 1:
+                if self.sort_order == Qt.SortOrder.AscendingOrder:
+                    self.intervals = self.intervals.order_by(Task.description)
+                else:
+                    self.intervals = self.intervals.order_by(Task.description.desc())
+            case 2:
+                if self.sort_order == Qt.SortOrder.AscendingOrder:
+                    self.intervals = self.intervals.order_by(Interval.start)
+                else:
+                    self.intervals = self.intervals.order_by(Interval.start.desc())
+            case 3:
+                if self.sort_order == Qt.SortOrder.AscendingOrder:
+                    self.intervals = self.intervals.order_by(Interval.end)
+                else:
+                    self.intervals = self.intervals.order_by(Interval.end.desc())
+            case 4:
+                if self.sort_order == Qt.SortOrder.AscendingOrder:
+                    self.intervals = sorted(self.intervals, key=lambda x: x.duration)
+                else:
+                    self.intervals = sorted(
+                        self.intervals, key=lambda x: x.duration, reverse=True
+                    )
+        self.layoutChanged.emit()
+
+    def sort(self, column: int, order: Qt.SortOrder) -> None:
+        self.sort_column = column
+        self.sort_order = order
+        self.refresh()
 
 
 class IntervalTab(QWidget, Ui_IntervalTab):

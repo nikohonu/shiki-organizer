@@ -53,6 +53,7 @@ class Ui_IntervalTab(object):
         self.view = QTableView(IntervalTab)
         self.view.setObjectName(u"view")
         self.view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.view.setSortingEnabled(True)
 
         self.verticalLayout.addWidget(self.view)
 

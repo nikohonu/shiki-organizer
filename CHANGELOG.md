@@ -11,6 +11,7 @@
 - Duration in so-interval ls command.
 - Period option for so-interval ls command.
 - Interval tab in GUI with equivalent of ls, modify, delete and add commands.
+- Sorting to the table on the Interval tab.
 
 ### Removed
 
