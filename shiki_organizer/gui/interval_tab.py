@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QHeaderView, QDialog
 from shiki_organizer.gui.ui.interval_tab import Ui_IntervalTab
-from shiki_organizer.gui.ui.interval_modify import Ui_IntervalModify
+from shiki_organizer.gui.ui.interval_add import Ui_IntervalAdd
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal, QTimer
 
 from shiki_organizer.model import Interval, Task
@@ -9,37 +9,63 @@ import datetime as dt
 from shiki_organizer.datetime import period_to_datetime
 
 
-class IntervalModify(QDialog, Ui_IntervalModify):
-    def __init__(self, task, start, end) -> None:
-        super(IntervalModify, self).__init__()
+class IntervalAdd(QDialog, Ui_IntervalAdd):
+    def __init__(
+        self, start: dt.datetime, end: dt.datetime = None, task: Task = None
+    ) -> None:
+        super(IntervalAdd, self).__init__()
         self.setupUi(self)
-        self.start.setDateTime(start)
-        if not end:
-            self.end_none.setChecked(True)
-            self.end.setDateTime(dt.datetime.now())
-            self.end.setEnabled(False)
-        else:
-            self.end.setDateTime(end)
-        self.end_none.stateChanged.connect(self.enable_disable_end)
-        self.tasks = list(Task.select())
+        self.tasks = list(Task.select().order_by(Task.description))
         self.task.addItems([task.description for task in self.tasks])
-        self.task.setCurrentIndex(self.tasks.index(task))
-
-    def enable_disable_end(self, state):
-        self.end.setEnabled(not bool(state))
-
-    def get_start(self):
-        return self.start.dateTime().toPython()
-
-    def get_end(self):
-        if self.end_none.isChecked():
-            return None
+        if task:
+            self.task.setCurrentIndex(self.tasks.index(task))
+        self.date.setDate(start.date())
+        self.start.setDateTime(start)
+        if end:
+            self.end.setDateTime(end)
         else:
-            return self.end.dateTime().toPython()
+            self.end.setDateTime(dt.datetime.now())
+            self.has_end.setChecked(False)
+            self.set_end(False)
+        self.calc_duration()
+        self.start.timeChanged.connect(self.calc_duration)
+        self.end.timeChanged.connect(self.calc_duration)
+        self.date.dateChanged.connect(self.calc_duration)
+        self.duration.timeChanged.connect(self.calc_end)
+        self.has_end.stateChanged.connect(self.set_end)
 
-    @property
-    def current_task(self):
-        return self.tasks[self.task.currentIndex()]
+    def set_end(self, has_end):
+        if bool(has_end):
+            self.end.setEnabled(True)
+            self.duration.setEnabled(True)
+        else:
+            self.end.setEnabled(False)
+            self.duration.setEnabled(False)
+
+    def calc_duration(self):
+        date = self.date.date().toPython()
+        start = dt.datetime.combine(date, self.start.time().toPython())
+        end = dt.datetime.combine(date, self.end.time().toPython())
+        if start < end:
+            duration = end - start
+            self.start.setDateTime(start)
+            self.end.setDateTime(end)
+            self.duration.setDateTime(dt.datetime.combine(date, dt.time.min) + duration)
+
+    def calc_end(self):
+        date = self.date.date().toPython()
+        start = dt.datetime.combine(date, self.start.time().toPython())
+        duration = self.duration.dateTime().toPython() - dt.datetime.combine(
+            date, dt.time.min
+        )
+        end = start + duration
+        self.end.setDateTime(end)
+
+    def result(self):
+        task = self.tasks[self.task.currentIndex()]
+        start = self.start.dateTime().toPython()
+        end = self.end.dateTime().toPython() if self.has_end.isChecked() else None
+        return task, start, end
 
 
 class IntervalModel(QAbstractTableModel):
@@ -101,20 +127,6 @@ class IntervalModel(QAbstractTableModel):
         self.dataChanged.emit(1, 1)
         self.headerDataChanged.emit(Qt.Orientation.Vertical, 1, 1)
 
-    def modify(self, index):
-        interval = Interval.get_by_id(index.data())
-        interval_modify = IntervalModify(interval.task, interval.start, interval.end)
-        if interval_modify.exec():
-            q = interval.update(
-                task=interval_modify.current_task,
-                start=interval_modify.get_start(),
-                end=interval_modify.get_end(),
-            ).where(Interval.id == interval.id)
-            q.execute()
-            self.refresh()
-        # actions.start(str(index.data()), dt.datetime.now(), None)
-        # self.refresh()
-
 
 class IntervalTab(QWidget, Ui_IntervalTab):
     def __init__(self):
@@ -131,14 +143,52 @@ class IntervalTab(QWidget, Ui_IntervalTab):
         self.period.currentTextChanged.connect(self.model.change_period)
 
         self.button_modify.clicked.connect(self.modify)
+        self.button_add.clicked.connect(self.add)
+        self.button_delete.clicked.connect(self.delete)
 
     def on_total_duration_changed(self, total_duration):
         self.status.setText(f"Total duration: {duration_to_str(total_duration)}")
 
-    def modify(self):
+    def get_selected_interval(self):
         selected_rows = self.view.selectionModel().selectedRows()
         if len(selected_rows) == 0:
             return
         if len(selected_rows) > 1:
             self.view.selectRow(selected_rows[0].row())
-        self.model.modify(selected_rows[0])
+        if selected_rows[0]:
+            return Interval.get_by_id(selected_rows[0].data())
+        else:
+            return None
+
+    def modify(self):
+        interval = self.get_selected_interval()
+        if interval:
+            interval_add = IntervalAdd(interval.start, interval.end, interval.task)
+            interval_add.setWindowTitle("Modify interval")
+            if interval_add.exec():
+                task, start, end = interval_add.result()
+                q = interval.update(
+                    task=task,
+                    start=start,
+                    end=end,
+                ).where(Interval.id == interval.id)
+                q.execute()
+                self.model.refresh()
+
+    def add(self):
+        interval = self.get_selected_interval()
+        task = interval.task if interval else None
+        interval_add = IntervalAdd(
+            dt.datetime.now(), dt.datetime.now() + dt.timedelta(minutes=5)
+        )
+        if interval_add.exec():
+            task, start, end = interval_add.result()
+            Interval.create(task=task, start=start, end=end)
+            Interval.reindex()
+            self.model.refresh()
+
+    def delete(self):
+        interval = self.get_selected_interval()
+        if interval:
+            interval.delete_instance()
+            self.model.refresh()
