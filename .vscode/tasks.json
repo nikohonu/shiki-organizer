@@ -16,7 +16,7 @@
     {
       "label": "ui",
       "type": "shell",
-      "command": "pyside6-uic shiki_organizer/gui/ui/interval_add.ui -g python -o shiki_organizer/gui/ui/interval_add.py; pyside6-uic shiki_organizer/gui/ui/interval_tab.ui -g python -o shiki_organizer/gui/ui/interval_tab.py; pyside6-uic shiki_organizer/gui/ui/main_window.ui -g python -o shiki_organizer/gui/ui/main_window.py; pyside6-uic shiki_organizer/gui/ui/tasks_tab.ui -g python -o shiki_organizer/gui/ui/tasks_tab.py",
+      "command": "./ui_to_py.sh",
       "problemMatcher": [],
       "group": {
         "kind": "build",

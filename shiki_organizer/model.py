@@ -13,14 +13,7 @@ from peewee import (
     UUIDField,
 )
 
-from pathlib import Path
-
-from appdirs import user_data_dir
-
-
-def get_user_data_dir():
-    return Path(user_data_dir("shiki-organizer", "Niko Honu"))
-
+from shiki_organizer.paths import get_user_data_dir
 
 database_path = get_user_data_dir() / "data.db"
 database_path.parent.mkdir(parents=True, exist_ok=True)
