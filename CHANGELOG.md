@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2022-12-24
+
 ### Added
 
 - Period, archived, uuid, root and duration option for so tree command.

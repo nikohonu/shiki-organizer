@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "shiki-organizer"
-version = "0.7.0"
-description = "To-do list cli program"
+version = "0.8.0"
+description = "To-do list CLI and GUI program"
 authors = ["Niko Honu <nikohonu@gmail.com>"]
 license = "MIT"
 readme = "README.md"

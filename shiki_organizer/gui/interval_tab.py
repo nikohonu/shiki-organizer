@@ -128,7 +128,6 @@ class IntervalModel(QAbstractTableModel):
         self.intervals = (
             Interval.select().join(Task).where(Interval.start >= self.start)
         )
-        print(self.sort_column, self.sort_order)
         match self.sort_column:
             case 0:
                 if self.sort_order == Qt.SortOrder.AscendingOrder:
