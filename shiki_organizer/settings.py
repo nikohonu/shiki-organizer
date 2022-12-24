@@ -1,6 +1,6 @@
 import json
+
 from shiki_organizer.paths import get_user_config_dir
-from pathlib import Path
 
 
 class SettingsMeta(type):

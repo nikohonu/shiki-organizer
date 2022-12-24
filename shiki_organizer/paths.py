@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from appdirs import user_data_dir, user_config_dir
+from appdirs import user_config_dir, user_data_dir
 
 
 def get_user_data_dir():

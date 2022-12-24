@@ -45,8 +45,6 @@ class Ui_SettingsTab(object):
 
         self.verticalLayout.addItem(self.verticalSpacer)
 
-#if QT_CONFIG(shortcut)
-#endif // QT_CONFIG(shortcut)
 
         self.retranslateUi(SettingsTab)
 

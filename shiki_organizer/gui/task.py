@@ -1,11 +1,11 @@
+import datetime as dt
 import os
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QBrush, QColor
 
-from shiki_organizer.model import Task
 import shiki_organizer.actions as actions
-import datetime as dt
+from shiki_organizer.model import Task
 
 
 class TaskTableModel(QAbstractTableModel):

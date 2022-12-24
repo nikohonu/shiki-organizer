@@ -7,6 +7,7 @@
 ### Added
 
 - Settings tab.
+- Repository tab.
 
 ## [0.8.0] - 2022-12-24
 

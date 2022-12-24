@@ -1,12 +1,13 @@
-from PySide6.QtWidgets import QWidget, QHeaderView, QDialog
-from shiki_organizer.gui.ui.interval_tab import Ui_IntervalTab
-from shiki_organizer.gui.ui.interval_add import Ui_IntervalAdd
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal, QTimer
-
-from shiki_organizer.model import Interval, Task
-from shiki_organizer.formatter import duration_to_str, datetime_to_str
 import datetime as dt
+
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, Signal
+from PySide6.QtWidgets import QDialog, QHeaderView, QWidget
+
 from shiki_organizer.datetime import period_to_datetime
+from shiki_organizer.formatter import datetime_to_str, duration_to_str
+from shiki_organizer.gui.ui.interval_add import Ui_IntervalAdd
+from shiki_organizer.gui.ui.interval_tab import Ui_IntervalTab
+from shiki_organizer.model import Interval, Task
 
 
 class IntervalAdd(QDialog, Ui_IntervalAdd):
@@ -199,10 +200,10 @@ class IntervalTab(QWidget, Ui_IntervalTab):
     def modify(self):
         interval = self.get_selected_interval()
         if interval:
-            interval_add = IntervalAdd(interval.start, interval.end, interval.task)
-            interval_add.setWindowTitle("Modify interval")
-            if interval_add.exec():
-                task, start, end = interval_add.result()
+            interval_modify = IntervalAdd(interval.start, interval.end, interval.task)
+            interval_modify.setWindowTitle("Modify interval")
+            if interval_modify.exec():
+                task, start, end = interval_modify.result()
                 q = interval.update(
                     task=task,
                     start=start,

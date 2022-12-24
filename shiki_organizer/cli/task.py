@@ -5,11 +5,11 @@ import uuid
 
 import click
 
-from shiki_organizer.actions import get_status
-from shiki_organizer.model import Interval, Task
 import shiki_organizer.actions as actions
+from shiki_organizer.actions import get_status
 from shiki_organizer.cli.formatter import task_to_str
 from shiki_organizer.datetime import period_to_datetime
+from shiki_organizer.model import Interval, Task
 
 
 @click.group()

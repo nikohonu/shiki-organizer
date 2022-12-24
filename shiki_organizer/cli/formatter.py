@@ -1,7 +1,8 @@
-from colorama import Fore, Style
 import datetime as dt
 
-from shiki_organizer.formatter import duration_to_str, datetime_to_str
+from colorama import Fore, Style
+
+from shiki_organizer.formatter import datetime_to_str, duration_to_str
 
 
 def label_value(label, data, color):

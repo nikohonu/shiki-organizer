@@ -3,7 +3,9 @@ import math
 import uuid
 
 from github import Github
-from shiki_organizer.model import Interval, Issue, Task
+
+from shiki_organizer.model import Interval, Issue, Repository, Task
+from shiki_organizer.settings import Settings
 
 
 def diff(a, b):
@@ -118,3 +120,44 @@ def stop():
         interval.save()
     else:
         print("There is no active time tracking.")
+
+
+def pull():
+    settings = Settings()
+    message = []
+
+    def process_issue(issues, repository, is_closed=False):
+        for i in issues:
+            created = False
+            issue, _ = Issue.get_or_create(id=i.number, repository=repository)
+            if not issue.task:
+                task = Task.create(
+                    description=i.title,
+                )
+                issue.task = task
+                message.append(f"Created task '{task.description}'.")
+                created = True
+            task = issue.task
+            old_description = task.description if task.description else None
+            task.description = f"{i.title} #{issue.id}"
+            if not created and old_description and task.description != old_description:
+                message.append(
+                    f"Rename task '{old_description}' to '{task.description}'."
+                )
+            task.parent = repository.parent
+            task.archived = is_closed
+            task.save()
+            issue.save()
+            Task.reindex()
+
+    if not settings.github_token:
+        raise Exception("GitHub token is required")
+    g = Github(settings.github_token)
+
+    for repository in Repository.select():
+        repo = g.get_repo(repository.name)
+        open_issues = repo.get_issues(state="open")
+        closed_issues = repo.get_issues(state="closed")
+        process_issue(open_issues, repository)
+        process_issue(closed_issues, repository, True)
+    return "\n".join(message)

@@ -1,5 +1,6 @@
-import pendulum
 import datetime as dt
+
+import pendulum
 
 
 def period_to_datetime(period: str):

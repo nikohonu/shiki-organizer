@@ -86,8 +86,6 @@ class Ui_IntervalAdd(object):
         self.task = QComboBox(IntervalAdd)
         self.task.setObjectName(u"task")
         self.task.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.task.setDuplicatesEnabled(False)
-        self.task.setFrame(True)
 
         self.gridLayout.addWidget(self.task, 1, 0, 1, 7)
 

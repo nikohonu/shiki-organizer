@@ -1,5 +1,6 @@
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QWidget
-from PySide6.QtGui import QShortcut, QKeySequence
+
 from shiki_organizer.gui.task import TaskTableModel
 from shiki_organizer.gui.ui.tasks_tab import Ui_TaskTab
 

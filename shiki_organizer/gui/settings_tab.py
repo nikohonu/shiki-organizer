@@ -1,8 +1,9 @@
 import json
 
-from shiki_organizer.gui.ui.settings_tab import Ui_SettingsTab
-from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import QValidator
+from PySide6.QtWidgets import QWidget
+
+from shiki_organizer.gui.ui.settings_tab import Ui_SettingsTab
 from shiki_organizer.settings import Settings
 
 

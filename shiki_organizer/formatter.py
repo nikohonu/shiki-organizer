@@ -1,5 +1,6 @@
 import datetime as dt
 
+
 def duration_to_str(duration):
     seconds = int(duration)
     minutes = int(duration / 60)
