@@ -26,16 +26,23 @@
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
-        <widget class="QPushButton" name="pushButton_4">
+        <widget class="QPushButton" name="button_add">
          <property name="text">
           <string>Add (A)</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="pushButton_5">
+        <widget class="QPushButton" name="button_delete">
          <property name="text">
           <string>Delete (D)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="button_modify">
+         <property name="text">
+          <string>Modify (E)</string>
          </property>
         </widget>
        </item>

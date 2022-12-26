@@ -51,8 +51,7 @@ class TaskTableModel(QAbstractTableModel):
         if self.today:
             tasks = tasks.where(Task.scheduled <= dt.date.today())
         self._tasks = [task for task in tasks]
-        self.dataChanged.emit(1, 1)
-        self.headerDataChanged.emit(Qt.Orientation.Vertical, 1, 1)
+        self.layoutChanged.emit()
 
     def done(self, indexes):
         github_token = os.environ.get("GITHUB_TOKEN", "")

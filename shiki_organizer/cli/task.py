@@ -26,13 +26,6 @@ def cli():
     type=click.Choice(list(string.ascii_uppercase)),
 )
 @click.option(
-    "-d",
-    "--divider",
-    default=1,
-    help="Divider of the task.",
-    type=click.IntRange(1),
-)
-@click.option(
     "-r",
     "--recurrence",
     help="Recurrence interval of the task.",
@@ -58,7 +51,7 @@ def cli():
     help="Id or uuid of the parent task.",
     type=str,
 )
-def add(description, priority, divider, recurrence, scheduled, deadline, parent):
+def add(description, priority, recurrence, scheduled, deadline, parent):
     if parent:
         if parent.isnumeric():
             parent = Task.get_by_id(int(parent))
@@ -67,7 +60,6 @@ def add(description, priority, divider, recurrence, scheduled, deadline, parent)
     task = Task.create(
         description=description,
         priority=priority,
-        divider=divider,
         recurrence=recurrence,
         scheduled=scheduled.date() if scheduled else None,
         deadline=deadline.date() if deadline else None,
@@ -93,14 +85,6 @@ def add(description, priority, divider, recurrence, scheduled, deadline, parent)
     flag_value="",
     help="Priority of the task.",
     type=click.Choice(list(string.ascii_uppercase) + [""]),
-)
-@click.option(
-    "-d",
-    "--divider",
-    is_flag=False,
-    flag_value=1,
-    help="Divider of the task.",
-    type=click.IntRange(1),
 )
 @click.option(
     "-r",
@@ -132,9 +116,7 @@ def add(description, priority, divider, recurrence, scheduled, deadline, parent)
     help="Id or uuid of the parent task.",
     type=str,
 )
-def modify(
-    task, description, priority, divider, recurrence, scheduled, deadline, parent
-):
+def modify(task, description, priority, recurrence, scheduled, deadline, parent):
     if task.isnumeric():
         task = Task.get_by_id(int(task))
     else:
@@ -154,8 +136,6 @@ def modify(
         priority = task.priority
     elif priority == "":
         priority = None
-    if divider == None:
-        divider = task.divider
     if recurrence == None:
         recurrence = task.recurrence
     elif recurrence == 0:
@@ -175,7 +155,6 @@ def modify(
     q = task.update(
         description=description,
         priority=priority,
-        divider=divider,
         recurrence=recurrence,
         scheduled=scheduled,
         deadline=deadline,

@@ -36,15 +36,20 @@ class Ui_TaskTab(object):
         self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.pushButton_4 = QPushButton(TaskTab)
-        self.pushButton_4.setObjectName(u"pushButton_4")
+        self.button_add = QPushButton(TaskTab)
+        self.button_add.setObjectName(u"button_add")
 
-        self.horizontalLayout_2.addWidget(self.pushButton_4)
+        self.horizontalLayout_2.addWidget(self.button_add)
 
-        self.pushButton_5 = QPushButton(TaskTab)
-        self.pushButton_5.setObjectName(u"pushButton_5")
+        self.button_delete = QPushButton(TaskTab)
+        self.button_delete.setObjectName(u"button_delete")
 
-        self.horizontalLayout_2.addWidget(self.pushButton_5)
+        self.horizontalLayout_2.addWidget(self.button_delete)
+
+        self.button_modify = QPushButton(TaskTab)
+        self.button_modify.setObjectName(u"button_modify")
+
+        self.horizontalLayout_2.addWidget(self.button_modify)
 
 
         self.horizontalLayout_3.addLayout(self.horizontalLayout_2)
@@ -84,8 +89,9 @@ class Ui_TaskTab(object):
 
     def retranslateUi(self, TaskTab):
         TaskTab.setWindowTitle(QCoreApplication.translate("TaskTab", u"Form", None))
-        self.pushButton_4.setText(QCoreApplication.translate("TaskTab", u"Add (A)", None))
-        self.pushButton_5.setText(QCoreApplication.translate("TaskTab", u"Delete (D)", None))
+        self.button_add.setText(QCoreApplication.translate("TaskTab", u"Add (A)", None))
+        self.button_delete.setText(QCoreApplication.translate("TaskTab", u"Delete (D)", None))
+        self.button_modify.setText(QCoreApplication.translate("TaskTab", u"Modify (E)", None))
         self.button_start.setText(QCoreApplication.translate("TaskTab", u"Start (S)", None))
         self.button_stop.setText(QCoreApplication.translate("TaskTab", u"Stop (Q)", None))
         self.button_done.setText(QCoreApplication.translate("TaskTab", u"Complete (C)", None))
