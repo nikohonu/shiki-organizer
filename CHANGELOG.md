@@ -10,6 +10,9 @@
 - Repository tab.
 - Add, delete and modify task.
 
+### Changed
+- Improve task tables.
+
 ## [0.8.0] - 2022-12-24
 
 ### Added

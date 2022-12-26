@@ -2,9 +2,9 @@ import datetime as dt
 import string
 
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QDialog, QWidget
+from PySide6.QtWidgets import QDialog, QHeaderView, QWidget
 
-from shiki_organizer.gui.task import TaskTableModel
+from shiki_organizer.gui.task import TaskModel
 from shiki_organizer.gui.ui.task_add import Ui_TaskAdd
 from shiki_organizer.gui.ui.tasks_tab import Ui_TaskTab
 from shiki_organizer.gui.ui_helper import shortcut_button_connect
@@ -107,8 +107,11 @@ class TasksTab(QWidget, Ui_TaskTab):
     def __init__(self, today: bool = True):
         super(TasksTab, self).__init__()
         self.setupUi(self)
-        self.model = TaskTableModel(today)
+        self.model = TaskModel(today)
         self.view.setModel(self.model)
+        # self.view.horizontalHeader().setSectionResizeMode(
+        #     QHeaderView.ResizeMode.ResizeToContents
+        # ) This works bad, and causes large lags
         self.shortcut_done = QShortcut(QKeySequence("C"), self)
         self.shortcut_start = QShortcut(QKeySequence("S"), self)
         self.shortcut_stop = QShortcut(QKeySequence("Q"), self)
