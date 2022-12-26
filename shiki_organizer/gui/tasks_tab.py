@@ -1,6 +1,7 @@
 import datetime as dt
 import string
 
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QHeaderView, QWidget
 
@@ -104,10 +105,17 @@ class TaskAdd(QDialog, Ui_TaskAdd):
 
 
 class TasksTab(QWidget, Ui_TaskTab):
-    def __init__(self, today: bool = True):
+    def __init__(
+        self,
+        update_all: Signal,
+        today: bool = True,
+    ):
         super(TasksTab, self).__init__()
         self.setupUi(self)
+        self.update_all = update_all
+
         self.model = TaskModel(today)
+        self.update_all.connect(self.model.refresh)
         self.view.setModel(self.model)
         # self.view.horizontalHeader().setSectionResizeMode(
         #     QHeaderView.ResizeMode.ResizeToContents
@@ -139,13 +147,16 @@ class TasksTab(QWidget, Ui_TaskTab):
     def done(self):
         self.model.done(self.view.selectionModel().selectedRows())
         self.view.selectionModel().clearSelection()
+        self.update_all.emit()
 
     def start(self):
         self.model.start(self.view.selectionModel().selectedRows()[0])
         self.view.selectionModel().clearSelection()
+        self.update_all.emit()
 
     def stop(self):
         self.model.stop()
+        self.update_all.emit()
 
     def add(self):
         task_add = TaskAdd()
@@ -167,7 +178,7 @@ class TasksTab(QWidget, Ui_TaskTab):
                 parent=parent,
             )
             Task.reindex()
-            self.model.refresh()
+            self.update_all.emit()
 
     def modify(self):
         task = self.get_selected_interval()

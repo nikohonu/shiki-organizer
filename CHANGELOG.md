@@ -9,6 +9,8 @@
 - Settings tab.
 - Repository tab.
 - Add, delete and modify task.
+- Sorting for task table.
+- Any action causes all data in the GUI application to be updated
 
 ### Changed
 - Improve task tables.

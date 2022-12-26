@@ -166,10 +166,15 @@ class IntervalModel(QAbstractTableModel):
 
 
 class IntervalTab(QWidget, Ui_IntervalTab):
-    def __init__(self):
+    def __init__(
+        self,
+        update_all: Signal,
+    ):
         super(IntervalTab, self).__init__()
         self.setupUi(self)
+        self.update_all = update_all
         self.model = IntervalModel()
+        self.update_all.connect(self.model.refresh)
         self.view.setModel(self.model)
         self.view.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents

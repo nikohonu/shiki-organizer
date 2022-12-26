@@ -29,6 +29,7 @@ class Ui_TaskTab(object):
         self.view = QTableView(TaskTab)
         self.view.setObjectName(u"view")
         self.view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.view.setSortingEnabled(True)
 
         self.verticalLayout.addWidget(self.view)
 
