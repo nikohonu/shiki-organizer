@@ -8,7 +8,7 @@ from shiki_organizer.datetime import period_to_datetime
 from shiki_organizer.formatter import datetime_to_str, duration_to_str
 from shiki_organizer.gui.ui.repository_add import Ui_RepositoryAdd
 from shiki_organizer.gui.ui.repository_tab import Ui_RepositoryTab
-from shiki_organizer.model import Interval, Repository, Task
+from shiki_organizer.database import Interval, Repository, Task
 
 
 class RepositoryAdd(QDialog, Ui_RepositoryAdd):

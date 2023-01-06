@@ -2,7 +2,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from shiki_organizer.view.main_windows import MainWindow
+from shiki_organizer.views.main_windows import MainWindow
 
 
 def main():

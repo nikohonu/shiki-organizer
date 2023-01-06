@@ -9,3 +9,6 @@ def get_user_data_dir():
 
 def get_user_config_dir():
     return Path(user_config_dir("shiki-organizer", "Niko Honu"))
+
+def get_database_path():
+    return get_user_data_dir() / "database.db"

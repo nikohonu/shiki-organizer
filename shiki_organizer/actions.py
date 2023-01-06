@@ -4,7 +4,7 @@ import uuid
 
 from github import Github
 
-from shiki_organizer.model import Interval, Issue, Repository, Task
+from shiki_organizer.database import Interval, Issue, Repository, Task
 from shiki_organizer.settings import Settings
 
 

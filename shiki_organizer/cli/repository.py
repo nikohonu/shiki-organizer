@@ -6,7 +6,7 @@ import click
 from github import Github
 
 import shiki_organizer.actions as actions
-from shiki_organizer.model import Interval, Issue, Repository, Task
+from shiki_organizer.database import Interval, Issue, Repository, Task
 
 
 @click.group()

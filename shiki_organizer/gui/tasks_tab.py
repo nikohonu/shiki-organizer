@@ -5,11 +5,11 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QHeaderView, QWidget
 
+from shiki_organizer.database import Task
 from shiki_organizer.gui.task import TaskModel
 from shiki_organizer.gui.ui.task_add import Ui_TaskAdd
 from shiki_organizer.gui.ui.tasks_tab import Ui_TaskTab
 from shiki_organizer.gui.ui_helper import shortcut_button_connect
-from shiki_organizer.model import Task
 
 
 class TaskAdd(QDialog, Ui_TaskAdd):

@@ -6,7 +6,7 @@ from PySide6.QtGui import QBrush, QColor
 
 import shiki_organizer.actions as actions
 from shiki_organizer.formatter import duration_to_str
-from shiki_organizer.model import Task
+from shiki_organizer.database import Task
 
 
 class TaskModel(QAbstractTableModel):

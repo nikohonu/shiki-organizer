@@ -7,7 +7,7 @@ from shiki_organizer.datetime import period_to_datetime
 from shiki_organizer.formatter import datetime_to_str, duration_to_str
 from shiki_organizer.gui.ui.interval_add import Ui_IntervalAdd
 from shiki_organizer.gui.ui.interval_tab import Ui_IntervalTab
-from shiki_organizer.model import Interval, Task
+from shiki_organizer.database import Interval, Task
 
 
 class IntervalAdd(QDialog, Ui_IntervalAdd):
