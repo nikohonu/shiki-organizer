@@ -203,7 +203,7 @@ def done(tasks):
     actions.done(tasks)
 
 
-def _update_tasks(start):
+def _update_tasks(start, global_days=False):
     query = Task.update(duration=0, days=0)
     query.execute()
     intervals = Interval.select().where(Interval.start >= start)
@@ -222,7 +222,10 @@ def _update_tasks(start):
     tasks = []
     for item in items:
         task = items[item]["task"]
-        task.days = len(items[item]["days"])
+        if not global_days:
+            task.days = len(items[item]["days"])
+        else:
+            task.days = (dt.datetime.now() - start).days + 1
         task.duration = items[item]["duration"]
         tasks.append(task)
     Task.bulk_update(tasks, fields=[Task.duration, Task.days])
@@ -264,15 +267,23 @@ def ls(today, archived):
 @click.option(
     "-d", "--duration", is_flag=True, default=False, help="Hide task without duration."
 )
+@click.option(
+    "-g",
+    "--global-days",
+    is_flag=True,
+    default=False,
+    help="Count days count from start date.",
+)
 @click.option("-r", "--root", help="Set the root task of tree.")
-def tree(period, archived, root, duration):
-    start = period_to_datetime(period)
+def tree(period, archived, root, duration, global_days):
+    min_start = Interval.select().order_by(Interval.start).get().start
+    start = period_to_datetime(period, min_start)
     if root:
         if root.isnumeric():
             root = Task.get_by_id(int(root))
         else:
             root = Task.get_by_uuid(uuid.UUID(root))
-    _update_tasks(start)
+    _update_tasks(start, global_days)
     tasks = sorted(
         Task.select().where((Task.parent == root)),
         key=lambda x: x.duration,
