@@ -240,7 +240,7 @@ def ls(today, archived):
     if today:
         tasks = sorted(
             tasks.where(Task.scheduled <= dt.date.today()),
-            key=lambda x: x.priority if x.priority else "a",
+            key=lambda x: x.order if x.order else float("-infinity"),
         )
     else:
         tasks = sorted(tasks, key=lambda x: x.scheduled if x.scheduled else dt.date.max)
@@ -262,13 +262,10 @@ def ls(today, archived):
     "-a", "--archived", is_flag=True, default=False, help="Show archived task."
 )
 @click.option(
-    "-u", "--uuid", is_flag=True, default=False, help="Show uuid of interval."
-)
-@click.option(
     "-d", "--duration", is_flag=True, default=False, help="Hide task without duration."
 )
 @click.option("-r", "--root", help="Set the root task of tree.")
-def tree(period, archived, uuid, root, duration):
+def tree(period, archived, root, duration):
     start = period_to_datetime(period)
     if root:
         if root.isnumeric():
