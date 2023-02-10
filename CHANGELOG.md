@@ -2,7 +2,7 @@
 
 # Changelog
 
-## [Unreleased]
+## [0.9.0]
 
 ### Added
 
@@ -14,6 +14,7 @@
 
 ### Changed
 - Improve task tables.
+- Update all dependencies.
 
 ## [0.8.0] - 2022-12-24
 
