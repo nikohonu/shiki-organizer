@@ -26,20 +26,25 @@ class BaseModel(Model):
 
 class Tag(BaseModel):
     name = TextField()
-    notes = TextField()
 
 
 class Task(BaseModel):
-    created = DateTimeField(default=dt.datetime.now())
     name = TextField()
     order = IntegerField(null=True)
-    notes = TextField(null=True)
     recurrence = IntegerField(null=True)
-    due = DateField(null=True)
-    until = DateField(null=True)
-    duration_per_day = IntegerField(null=True)
+    scheduled = DateField(null=True)
+    deadline = DateField(null=True)
     parent = ForeignKeyField("self", on_delete="CASCADE", null=True)
     archived = BooleanField(default=False)
+    duration = IntegerField(null=True) # using in calculation
+    days = IntegerField(null=True) # using in calculation
+
+    @property
+    def average(self):
+        if self.days:
+            return self.duration / self.days
+        else:
+            return 0
 
 
 class TaskTag(BaseModel):
@@ -54,7 +59,13 @@ class Interval(BaseModel):
     task = ForeignKeyField(Task)
     start = DateTimeField(null=True)
     end = DateTimeField(null=True)
-    duration = IntegerField(null=True)
+
+    @property
+    def duration(self):
+        if self.end:
+            return (self.end - self.start).total_seconds()
+        else:
+            return (dt.datetime.now() - self.start).total_seconds()
 
 
 models = BaseModel.__subclasses__()

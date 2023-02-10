@@ -8,8 +8,8 @@ import click
 import shiki_organizer.actions as actions
 from shiki_organizer.actions import get_status
 from shiki_organizer.cli.formatter import task_to_str
-from shiki_organizer.datetime import period_to_datetime
 from shiki_organizer.database import Interval, Task
+from shiki_organizer.datetime import period_to_datetime
 
 
 @click.group()
@@ -18,12 +18,12 @@ def cli():
 
 
 @click.command()
-@click.argument("description")
+@click.argument("name")
 @click.option(
-    "-p",
-    "--priority",
-    help="Priority of the task.",
-    type=click.Choice(list(string.ascii_uppercase)),
+    "-o",
+    "--order",
+    help="Order (priority) of the task.",
+    type=click.IntRange(0),
 )
 @click.option(
     "-r",
@@ -40,6 +40,7 @@ def cli():
     type=click.DateTime(formats=["%Y-%m-%d"]),
 )
 @click.option(
+    "-d",
     "--deadline",
     is_flag=False,
     flag_value=str(dt.date.today()),
@@ -47,44 +48,40 @@ def cli():
     type=click.DateTime(formats=["%Y-%m-%d"]),
 )
 @click.option(
+    "-p",
     "--parent",
-    help="Id or uuid of the parent task.",
-    type=str,
+    help="id of the parent task.",
+    type=click.Choice([str(task.id) for task in Task]),
 )
-def add(description, priority, recurrence, scheduled, deadline, parent):
+def add(name, order, recurrence, scheduled, deadline, parent):
     if parent:
-        if parent.isnumeric():
-            parent = Task.get_by_id(int(parent))
-        else:
-            parent = uuid.UUID(parent)
+        parent = Task.get_by_id(int(parent))
     task = Task.create(
-        description=description,
-        priority=priority,
+        name=name,
+        order=order,
         recurrence=recurrence,
         scheduled=scheduled.date() if scheduled else None,
         deadline=deadline.date() if deadline else None,
         parent=parent,
     )
-    Task.reindex()
-    task = Task.get_by_uuid(task.uuid)
     print(f"Created task {task.id}.")
 
 
 @click.command()
-@click.argument("task")
+@click.argument("task", type=click.Choice([str(task.id) for task in Task]))
 @click.option(
     "-n",
-    "--description",
-    help="Description of the task.",
+    "--name",
+    help="Name of the task.",
     type=str,
 )
 @click.option(
-    "-p",
-    "--priority",
+    "-o",
+    "--order",
     is_flag=False,
     flag_value="",
-    help="Priority of the task.",
-    type=click.Choice(list(string.ascii_uppercase) + [""]),
+    help="Order (priority) of the task.",
+    type=click.IntRange(0),
 )
 @click.option(
     "-r",
@@ -92,7 +89,7 @@ def add(description, priority, recurrence, scheduled, deadline, parent):
     is_flag=False,
     flag_value=0,
     help="Recurrence interval of the task.",
-    type=int,
+    type=click.IntRange(0),
 )
 @click.option(
     "-s",
@@ -110,32 +107,27 @@ def add(description, priority, recurrence, scheduled, deadline, parent):
     type=click.DateTime(formats=["%Y-%m-%d"]),
 )
 @click.option(
+    "-p",
     "--parent",
     is_flag=False,
     flag_value="",
-    help="Id or uuid of the parent task.",
-    type=str,
+    help="Id of the parent task.",
+    type=click.Choice([str(task.id) for task in Task]),
 )
-def modify(task, description, priority, recurrence, scheduled, deadline, parent):
-    if task.isnumeric():
-        task = Task.get_by_id(int(task))
-    else:
-        task = Task.get_by_uuid(uuid.UUID(task))
+def modify(task, name, order, recurrence, scheduled, deadline, parent):
+    task = Task.get_by_id(int(task))
     if parent:
-        if parent.isnumeric():
-            parent = Task.get_by_id(int(parent))
-        else:
-            parent = uuid.UUID(parent)
+        parent = Task.get_by_id(int(parent))
     elif parent == "":
         parent = None
     else:
         parent = task.parent
 
-    description = task.description if description == None else description
-    if priority == None:
-        priority = task.priority
-    elif priority == "":
-        priority = None
+    name = task.name if name == None else name
+    if order == None:
+        order = task.order
+    elif order == "":
+        order = None
     if recurrence == None:
         recurrence = task.recurrence
     elif recurrence == 0:
@@ -153,31 +145,28 @@ def modify(task, description, priority, recurrence, scheduled, deadline, parent)
     else:
         deadline = deadline.date()
     q = task.update(
-        description=description,
-        priority=priority,
+        name=name,
+        order=order,
         recurrence=recurrence,
         scheduled=scheduled,
         deadline=deadline,
         parent=parent,
     ).where(Task.id == task.id)
     q.execute()
-    print(f"Modifying task {task.id} '{task.description}'.")
+    print(f"Modifying task {task.id} '{task.name}'.")
 
 
 @click.command()
-@click.argument("task")
+@click.argument("task", type=click.Choice([str(task.id) for task in Task]))
 def delete(task):
-    if task.isnumeric():
-        task = Task.get_by_id(int(task))
-    else:
-        task = Task.get_by_uuid(uuid.UUID(task))
+    task = Task.get_by_id(int(task))
     Interval.delete().where(Interval.task == task).execute()
     task.delete_instance()
-    print(f"Deleting task {task.id} '{task.description}'.")
+    print(f"Deleting task {task.id} '{task.name}'.")
 
 
 @click.command()
-@click.argument("task")
+@click.argument("task", type=click.Choice([str(task.id) for task in Task]))
 @click.option(
     "-s",
     "--start",
@@ -209,10 +198,9 @@ def status():
 
 
 @click.command()
-@click.argument("task")
-@click.option("--github-token", default=lambda: os.environ.get("GITHUB_TOKEN", ""))
-def done(task, github_token):
-    actions.done([task], github_token)
+@click.argument("tasks", type=click.Choice([str(task.id) for task in Task]), nargs=-1)
+def done(tasks):
+    actions.done(tasks)
 
 
 def _update_tasks(start):
@@ -247,10 +235,7 @@ def _update_tasks(start):
 @click.option(
     "-a", "--archived", is_flag=True, default=False, help="Show archived task."
 )
-@click.option(
-    "-u", "--uuid", is_flag=True, default=False, help="Show uuid of interval."
-)
-def ls(today, archived, uuid):
+def ls(today, archived):
     tasks = Task.select()
     if today:
         tasks = sorted(
@@ -262,7 +247,7 @@ def ls(today, archived, uuid):
     if not archived:
         tasks = filter(lambda x: not x.archived, tasks)
     for task in tasks:
-        print(task_to_str(task, uuid))
+        print(task_to_str(task))
 
 
 @click.command()
@@ -306,13 +291,8 @@ def tree(period, archived, uuid, root, duration):
                 key=lambda x: x.duration,
             )
             queue += [(item[0] + 1, task) for task in tasks]
-            space = "\t"
-            print(f"{space * item[0]}{task_to_str(item[1], uuid)}")
-
-
-@click.command()
-def reindex():
-    Task.reindex()
+            space = "    "
+            print(f"{space * item[0]}{task_to_str(item[1])}")
 
 
 cli.add_command(add)
@@ -324,7 +304,6 @@ cli.add_command(status)
 cli.add_command(done)
 cli.add_command(ls)
 cli.add_command(tree)
-cli.add_command(reindex)
 
 
 def main():

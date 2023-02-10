@@ -2,9 +2,7 @@ import datetime as dt
 import math
 import uuid
 
-from github import Github
-
-from shiki_organizer.database import Interval, Issue, Repository, Task
+from shiki_organizer.database import Interval, Task
 from shiki_organizer.settings import Settings
 
 
@@ -28,14 +26,11 @@ def get_status(message="Tracking") -> str:
     ).rjust(21, " ")
     start = interval.start.strftime("%Y-%m-%dT%H:%M:%S").rjust(19, " ")
     end = diff(start, end.strftime("%Y-%m-%dT%H:%M:%S")).rjust(19, " ")
-    return f'{message} "{task.description}"\n  Started {interval.start}\n  Current {end}\n  Total {duration}'
+    return f'{message} "{task.name}"\n  Started {interval.start}\n  Current {end}\n  Total {duration}'
 
 
 def start(task: str, start, end):
-    if task.isnumeric():
-        task = Task.get_by_id(int(task))
-    else:
-        task = Task.get_by_uuid(uuid.UUID(task))
+    task = Task.get_by_id(int(task))
     interval = Interval.get_or_none(Interval.end == None)
     if interval:
         if interval.task == task:
@@ -54,7 +49,6 @@ def start(task: str, start, end):
         return
     Interval.create(task=task, start=start, end=end)
     print(get_status())
-    Interval.reindex()
 
 
 def get_current_task():
@@ -75,15 +69,12 @@ def close_issue(task: Task, github_token: str):
         for i in open_issues:
             if issue.id == i.number:
                 i.edit(state="closed")
-        print(f"Close issue {task.id} '{task.description}'.")
+        print(f"Close issue {task.id} '{task.name}'.")
 
 
-def done(tasks: list, github_token: str):
+def done(tasks: list):
     for task in tasks:
-        if task.isnumeric():
-            task = Task.get_by_id(int(task))
-        else:
-            task = Task.get_by_uuid(uuid.UUID(task))
+        task = Task.get_by_id(int(task))
         interval = Interval.get_or_none(
             (Interval.end == None) & (Interval.task == task)
         )
@@ -101,12 +92,10 @@ def done(tasks: list, github_token: str):
         else:
             task.archived = True
         task.save()
-        print(f"Completed task {task.id} '{task.description}'.")
         if not task.archived:
-            print(
-                f"Reschedule task {task.id} '{task.description}' to {task.scheduled}."
-            )
-        close_issue(task, github_token)
+            print(f"Reschedule task {task.id} '{task.name}' to {task.scheduled}.")
+        else:
+            print(f"Completed task {task.id} '{task.name}'.")
 
 
 def stop():
@@ -135,15 +124,13 @@ def pull():
                     description=i.title,
                 )
                 issue.task = task
-                message.append(f"Created task '{task.description}'.")
+                message.append(f"Created task '{task.name}'.")
                 created = True
             task = issue.task
-            old_description = task.description if task.description else None
-            task.description = f"{i.title} #{issue.id}"
-            if not created and old_description and task.description != old_description:
-                message.append(
-                    f"Rename task '{old_description}' to '{task.description}'."
-                )
+            old_description = task.name if task.name else None
+            task.name = f"{i.title} #{issue.id}"
+            if not created and old_description and task.name != old_description:
+                message.append(f"Rename task '{old_description}' to '{task.name}'.")
             task.parent = repository.parent
             task.archived = is_closed
             task.save()

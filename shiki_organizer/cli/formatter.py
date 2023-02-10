@@ -25,15 +25,10 @@ def label_value_or_none(
         return ""
 
 
-def task_to_str(task, show_uuid):
-    if show_uuid or not task.id:
-        uuid = label_value_or_none("uuid", task.uuid, Fore.CYAN)
-        id = ""
-    else:
-        uuid = ""
-        id = f"{task.id} "
-    priority = (
-        f"{Fore.BLUE}({task.priority}){Style.RESET_ALL} " if task.priority else ""
+def task_to_str(task):
+    id = f"{task.id} "
+    order = (
+        f"{Fore.BLUE}({task.order}){Style.RESET_ALL} " if task.order else ""
     )
     scheduled = label_value_or_none("scheduled", task.scheduled, Fore.MAGENTA)
     deadline = label_value_or_none("deadline", task.deadline, Fore.RED)
@@ -49,14 +44,14 @@ def task_to_str(task, show_uuid):
         duration_to_str(task.duration),
         space_after=False,
     )
-    return f"{id}{priority}{task.description} {uuid}{scheduled}{recurrence}{deadline}{days}{average}{duration}"
+    return f"{id}{order}{task.name} {scheduled}{recurrence}{deadline}{days}{average}{duration}"
 
 
 def interval_to_str(interval, show_uuid):
     uuid = label_value_or_none("uuid", show_uuid, Fore.CYAN, interval.uuid)
     id = label_value_or_none("id", interval.id, Fore.RED)
     task = label_value_or_none(
-        "task", interval.task, Fore.YELLOW, interval.task.description
+        "task", interval.task, Fore.YELLOW, interval.task.name
     )
     start = label_value_or_none("start", interval.start, Fore.BLUE)
     end = label_value_or_none("end", interval.end, Fore.MAGENTA)
