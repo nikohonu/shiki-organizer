@@ -1,6 +1,7 @@
 import datetime as dt
 
 from peewee import (
+    AutoField,
     BooleanField,
     CompositeKey,
     DateField,
@@ -24,49 +25,51 @@ class BaseModel(Model):
         database = database
 
 
-class Tag(BaseModel):
+class Namespace(BaseModel):
+    id = AutoField()
     name = TextField()
+
+
+class Subtag(BaseModel):
+    id = AutoField()
+    name = TextField()
+
+
+class Tag(BaseModel):
+    id = AutoField()
+    namespace = ForeignKeyField(Namespace)
+    subtag = ForeignKeyField(Subtag)
+
+    @property
+    def name(self):
+        return f"[bold red]{self.namespace.name}:[/bold red]{self.subtag.name}"
+
+    class Meta:
+        indexes = ((("namespace", "subtag"), True),)
 
 
 class Task(BaseModel):
+    id = AutoField()
     name = TextField()
-    order = IntegerField(null=True)
-    recurrence = IntegerField(null=True)
-    scheduled = DateField(null=True)
-    deadline = DateField(null=True)
-    parent = ForeignKeyField("self", on_delete="CASCADE", null=True)
-    archived = BooleanField(default=False)
-    duration = IntegerField(null=True) # using in calculation
-    days = IntegerField(null=True) # using in calculation
-
-    @property
-    def average(self):
-        if self.days:
-            return self.duration / self.days
-        else:
-            return 0
+    notes = TextField(null=True)
 
 
 class TaskTag(BaseModel):
+    id = AutoField()
     task = ForeignKeyField(Task)
     tag = ForeignKeyField(Tag)
 
     class Meta:
-        primary_key = CompositeKey("task", "tag")
+        indexes = ((("task", "tag"), True),)
 
 
 class Interval(BaseModel):
+    id = AutoField()
     task = ForeignKeyField(Task)
-    start = DateTimeField(null=True)
+    start = DateTimeField(default=dt.datetime.now())
     end = DateTimeField(null=True)
-
-    @property
-    def duration(self):
-        if self.end:
-            return (self.end - self.start).total_seconds()
-        else:
-            return (dt.datetime.now() - self.start).total_seconds()
 
 
 models = BaseModel.__subclasses__()
 database.create_tables(models)
+Namespace.get_or_create(name="")
