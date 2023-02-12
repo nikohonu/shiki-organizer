@@ -10,6 +10,7 @@ from shiki_organizer.actions import get_status
 from shiki_organizer.cli.formatter import task_to_str
 from shiki_organizer.database import Interval, Task
 from shiki_organizer.datetime import period_to_datetime
+from rich.console import Console
 
 
 @click.group()
@@ -276,6 +277,7 @@ def ls(today, archived):
 )
 @click.option("-r", "--root", help="Set the root task of tree.")
 def tree(period, archived, root, duration, global_days):
+    console = Console(highlight=False)
     min_start = Interval.select().order_by(Interval.start).get().start
     start = period_to_datetime(period, min_start)
     if root:
@@ -300,7 +302,7 @@ def tree(period, archived, root, duration, global_days):
             )
             queue += [(item[0] + 1, task) for task in tasks]
             space = "    "
-            print(f"{space * item[0]}{task_to_str(item[1])}")
+            console.print(f"{space * item[0]}{task_to_str(item[1])}")
 
 
 cli.add_command(add)
