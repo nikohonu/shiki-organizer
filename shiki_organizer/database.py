@@ -69,6 +69,10 @@ class Interval(BaseModel):
     start = DateTimeField(default=dt.datetime.now())
     end = DateTimeField(null=True)
 
+    @property
+    def duration(self):
+        return (self.end - self.start).seconds
+
 
 models = BaseModel.__subclasses__()
 database.create_tables(models)
