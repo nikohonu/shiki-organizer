@@ -71,7 +71,8 @@ class Interval(BaseModel):
 
     @property
     def duration(self):
-        return (self.end - self.start).seconds
+        end = self.end if self.end else dt.datetime.now()
+        return (end - self.start).seconds
 
 
 models = BaseModel.__subclasses__()

@@ -1,4 +1,3 @@
-import ast
 import datetime as dt
 
 import shiki_organizer.models.task as task_model
@@ -22,20 +21,29 @@ def str_to_types(string: str):
         return string
 
 
-def all():
+def task_to_dict(task, tags):
+    return {
+        "id": task.id,
+        "name": task.name,
+        "notes": task.notes,
+        "tags": [[tag.namespace.name, str_to_types(tag.subtag.name)] for tag in tags],
+    }
+
+
+def interval_to_dict(interval):
+    return {
+        "task_id": interval.task.id,
+        "start": interval.start,
+        "end": interval.end,
+        "duration": interval.duration,
+    }
+
+
+def all(task_ids=None):
     result = []
-    for task in task_model.all():
+    for task in task_model.all(task_ids):
         tags = task_model.get_tags(task)
-        result.append(
-            {
-                "id": task.id,
-                "name": task.name,
-                "notes": task.notes,
-                "tags": [
-                    [tag.namespace.name, str_to_types(tag.subtag.name)] for tag in tags
-                ],
-            }
-        )
+        result.append(task_to_dict(task, tags))
     return result
 
 
@@ -61,57 +69,23 @@ def stop():
 
 
 def get_intervals():
-    return [
-        {
-            "task_id": interval.task.id,
-            "start": interval.start,
-            "end": interval.end,
-            "duration": interval.duration,
-        }
-        for interval in task_model.get_intervals()
-    ]
+    return [interval_to_dict(interval) for interval in task_model.get_intervals()]
 
 
-def get_subtag(task_id, namespace):
-    task = Task.get_by_id(task_id)
-    namespace = Namespace.get_or_none(Namespace.name == namespace)
-    if not namespace:
-        return
-    task_tags = (
-        TaskTag.select()
-        .join(Tag)
-        .where((TaskTag.task == task) & (Tag.namespace == namespace))
+def get_current_interval():
+    interval = task_model.get_current_interval()
+    return interval_to_dict(interval) if interval else None
+
+
+def tag(task_id, raw_tags):
+    task_model.add_tags(task_model.get_by_id(task_id), task_model.create_tags(raw_tags))
+
+
+def untag(task_id, raw_tags):
+    task_model.remove_tags(
+        task_model.get_by_id(task_id), task_model.create_tags(raw_tags)
     )
-    if task_tags.count():
-        tag = task_tags.get().tag
-        return tag
 
 
-def get_subtag_date(task_id, namespace):
-    tag = get_subtag(task_id, namespace)
-    if tag:
-        return dt.datetime.strptime(tag.subtag.name, "%Y-%m-%d")
-
-
-def get_subtag_int(task_id, namespace):
-    tag = get_subtag(task_id, namespace)
-    if tag:
-        return int(tag.subtag.name)
-
-
-def get_subtag_str(task_id, namespace):
-    tag = get_subtag(task_id, namespace)
-    if tag:
-        return str(tag.subtag.name)
-
-
-def remove_namespaces(task_id, namespaces):
-    task = Task.get_by_id(task_id)
-    for namespace in namespaces:
-        namespace = Namespace.get_or_none(Namespace.name == namespace)
-        if namespace:
-            tags = Tag.select().where(Tag.namespace == namespace)
-            query = TaskTag.delete().where(
-                (TaskTag.task == task) & (TaskTag.tag.in_(tags))
-            )
-            query.execute()
+def get_by_id(task_id):
+    return task_to_dict(task_model.get_by_id(task_id), task_model.get_tags(task_id))

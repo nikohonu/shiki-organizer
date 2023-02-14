@@ -7,8 +7,11 @@ def get_tags(task):
     return [task_tag.tag for task_tag in TaskTag.select().where(TaskTag.task == task)]
 
 
-def all():
-    return [task for task in Task.select()]
+def all(task_ids=None):
+    if not task_ids:
+        return [task for task in Task.select()]
+    else:
+        return [task for task in Task.select().where(Task.id.in_(task_ids))]
 
 
 def add(name, notes):
@@ -68,3 +71,18 @@ def stop():
 
 def get_intervals():
     return Interval.select()
+
+def get_current_interval():
+    return Interval.get_or_none(Interval.end == None)
+
+
+def remove_tags(task, tags):
+    query = TaskTag.delete().where((TaskTag.task == task) & (TaskTag.tag.in_(tags)))
+    query.execute()
+    for tag in tags:
+        if tag.subtag.name == "*":
+            tags_ = Tag.select().where(Tag.namespace == tag.namespace)
+            query = TaskTag.delete().where(
+                (TaskTag.task == task) & (TaskTag.tag.in_(tags_))
+            )
+            query.execute()
