@@ -31,6 +31,7 @@ def task_to_dict(task, tags):
 
 def interval_to_dict(interval):
     return {
+        "id": interval.id,
         "task_id": interval.task.id,
         "start": interval.start,
         "end": interval.end,
