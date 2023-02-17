@@ -1,7 +1,6 @@
 import datetime as dt
 
 import shiki_organizer.models.task as task_model
-from shiki_organizer.database import Interval, Namespace, Subtag, Tag, Task, TaskTag
 
 
 def str_to_types(string: str):
@@ -48,11 +47,16 @@ def all(task_ids=None):
 
 
 def add(name, notes, raw_tags):
-    task_model.add_tags(task_model.add(name, notes), task_model.create_tags(raw_tags))
+    task = task_model.add(name, notes)
+    task_model.add_tags(task, task_model.create_tags(raw_tags))
+    return task.id
 
 
 def delete(task_id):
-    task_model.delete(task_model.get_by_id(task_id))
+    task = task_model.get_by_id(task_id)
+    id, name = task.id, task.name
+    task_model.delete(task)
+    return id, name
 
 
 def get_ids():
