@@ -72,6 +72,7 @@ def stop():
 def get_intervals():
     return Interval.select()
 
+
 def get_current_interval():
     return Interval.get_or_none(Interval.end == None)
 

@@ -1,6 +1,10 @@
 import datetime as dt
 
+from peewee import JOIN
+
 import shiki_organizer.models.task as task_model
+from shiki_organizer.database import Interval, Namespace, Subtag, Tag, Task, TaskTag
+from shiki_organizer.model import build_dict, cur
 
 
 def str_to_types(string: str):
@@ -20,7 +24,7 @@ def str_to_types(string: str):
         return string
 
 
-def task_to_dict(task, tags):
+def _task_to_dict(task, tags):
     return {
         "id": task.id,
         "name": task.name,
@@ -29,7 +33,7 @@ def task_to_dict(task, tags):
     }
 
 
-def interval_to_dict(interval):
+def _interval_to_dict(interval):
     return {
         "id": interval.id,
         "task_id": interval.task.id,
@@ -40,11 +44,36 @@ def interval_to_dict(interval):
 
 
 def all(task_ids=None):
-    result = []
-    for task in task_model.all(task_ids):
-        tags = task_model.get_tags(task)
-        result.append(task_to_dict(task, tags))
-    return result
+    tasks = build_dict(
+        cur.execute("SELECT id, name, notes FROM task").fetchall(),
+        ["id", "name", "notes"],
+    )
+    tasks_tags = build_dict(
+        cur.execute(
+            "SELECT tasktag.task_id, namespace.name, subtag.name from tasktag "
+            "JOIN tag on tasktag.tag_id = tag.id "
+            "JOIN namespace ON tag.namespace_id = namespace.id "
+            "JOIN subtag ON tag.subtag_id = subtag.id"
+        ).fetchall(),
+        ["task_id", "namespace", "subtag"],
+    )
+    for task in tasks:
+        raw_tags = [
+            (task_tag["namespace"], str_to_types(task_tag["subtag"]))
+            for task_tag in tasks_tags
+            if task_tag["task_id"] == task["id"]
+        ]
+        tags = {}
+        for namespace, subtag in raw_tags:
+            if namespace in tags:
+                tags[namespace].append(subtag)
+            else:
+                tags[namespace] = [subtag]
+        task["tags"] = tags
+    if task_ids:
+        return [task for task in tasks if task["id"] in task_ids]
+    else:
+        return tasks
 
 
 def add(name, notes, raw_tags):
@@ -74,12 +103,12 @@ def stop():
 
 
 def get_intervals():
-    return [interval_to_dict(interval) for interval in task_model.get_intervals()]
+    return [_interval_to_dict(interval) for interval in task_model.get_intervals()]
 
 
 def get_current_interval():
     interval = task_model.get_current_interval()
-    return interval_to_dict(interval) if interval else None
+    return _interval_to_dict(interval) if interval else None
 
 
 def tag(task_id, raw_tags):
@@ -93,4 +122,4 @@ def untag(task_id, raw_tags):
 
 
 def get_by_id(task_id):
-    return task_to_dict(task_model.get_by_id(task_id), task_model.get_tags(task_id))
+    return _task_to_dict(task_model.get_by_id(task_id), task_model.get_tags(task_id))
