@@ -1,5 +1,7 @@
 import datetime as dt
+from pathlib import Path
 
+from appdirs import user_config_dir, user_data_dir
 from peewee import (
     AutoField,
     BooleanField,
@@ -13,9 +15,7 @@ from peewee import (
     TextField,
 )
 
-from shiki_organizer.paths import get_database_path
-
-database_path = get_database_path()
+database_path = Path(user_data_dir("shiki-organizer", "Niko Honu")) / "database.db"
 database_path.parent.mkdir(parents=True, exist_ok=True)
 database = SqliteDatabase(database_path, pragmas={"foreign_keys": 1})
 
