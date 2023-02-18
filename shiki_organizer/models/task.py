@@ -1,89 +1,92 @@
 import datetime as dt
+from typing import List, Set, Tuple
 
-from shiki_organizer.database import Interval, Namespace, Subtag, Tag, Task, TaskTag
+from shiki_organizer.models.database import (
+    Interval,
+    Namespace,
+    Subtag,
+    Tag,
+    Task,
+    TaskTag,
+)
 
 
-def get_tags(task):
-    return [task_tag.tag for task_tag in TaskTag.select().where(TaskTag.task == task)]
-
-
-def all(task_ids=None):
-    if not task_ids:
-        return [task for task in Task.select()]
+def _str_tag_to_tuple(tag):
+    if tag.find(":") != -1:
+        tag = tuple(tag.split(":", 1))
     else:
-        return [task for task in Task.select().where(Task.id.in_(task_ids))]
+        tag = ("", tag)
+    return tag
 
 
-def add(name, notes):
+def get_task_ids():
+    return [task.id for task in Task.select()]
+
+
+def add_task(
+    name: str,
+    notes: str | None,
+    parent_id: int | None,
+    order: int | None,
+    scheduled: dt.date | None,
+    recurrence: int | None,
+    tags: List[str],
+):
     task = Task.create(name=name, notes=notes)
+    task_tags = {_str_tag_to_tuple(tag) for tag in tags}
+    task_tags.add(("parent", str(parent_id))) if parent_id else None
+    task_tags.add(("order", str(order))) if order else None
+    task_tags.add(("scheduled", str(scheduled))) if scheduled else None
+    task_tags.add(("recurrence", str(recurrence))) if recurrence else None
+    tag_task(task, task_tags)
     return task
 
 
-def create_tags(raw_tags):
-    tags = []
-    namespaces = {}
-    subtags = {}
-    for namespace, subtag in raw_tags:
-        if namespace not in namespaces:
-            namespaces[namespace], _ = Namespace.get_or_create(name=namespace)
-        if subtag not in subtags:
-            subtags[subtag], _ = Subtag.get_or_create(name=subtag)
-        tag, _ = Tag.get_or_create(
-            namespace=namespaces[namespace], subtag=subtags[subtag]
-        )
-        tags.append(tag)
-    return tags
+def tag_task(task, tags: Set[tuple]):
+    for namespace, subtag in tags:
+        namespace, _ = Namespace.get_or_create(name=namespace)
+        subtag, _ = Subtag.get_or_create(name=subtag)
+        tag, _ = Tag.get_or_create(namespace=namespace, subtag=subtag)
+        TaskTag.create(task=task, tag=tag)
 
 
-def add_tags(task, tags):
-    for tag in tags:
-        TaskTag.get_or_create(task=task, tag=tag)
-
-
-def get_by_id(task_id):
-    return Task.get_by_id(task_id)
-
-
-def delete(task):
-    task.delete_instance(recursive=True)
-
-
-def start(task, start, end):
-    interval = Interval.get_or_none(Interval.end == None)
-    if interval:
-        if interval.task == task:
-            return
+def untag_task(task, tags: Set[tuple]):
+    for namespace, subtag in tags:
+        namespace, _ = Namespace.get_or_create(name=namespace)
+        if subtag == "*":
+            target_tags = Tag.select().where(Tag.namespace == namespace)
         else:
-            interval.end = dt.datetime.now()
-            interval.save()
-    if end and end < start:
-        end = None
-        return
-    Interval.create(task=task, start=start, end=end)
-
-
-def stop():
-    interval = Interval.get_or_none(Interval.end == None)
-    if interval:
-        interval.end = dt.datetime.now()
-        interval.save()
-
-
-def get_intervals():
-    return Interval.select()
-
-
-def get_current_interval():
-    return Interval.get_or_none(Interval.end == None)
-
-
-def remove_tags(task, tags):
-    query = TaskTag.delete().where((TaskTag.task == task) & (TaskTag.tag.in_(tags)))
-    query.execute()
-    for tag in tags:
-        if tag.subtag.name == "*":
-            tags_ = Tag.select().where(Tag.namespace == tag.namespace)
-            query = TaskTag.delete().where(
-                (TaskTag.task == task) & (TaskTag.tag.in_(tags_))
+            subtag, _ = Subtag.get_or_create(name=subtag)
+            target_tags = Tag.select().where(
+                Tag.namespace == namespace, Tag.subtag == subtag
             )
-            query.execute()
+        query = TaskTag.delete().where(
+            (TaskTag.task == task) & (TaskTag.tag.in_(target_tags))
+        )
+        query.execute()
+
+
+def modify_task(
+    id: int,
+    name: str | None,
+    notes: str | None,
+    parent_id: int | None,
+    order: int | None,
+    scheduled: dt.date | None,
+    recurrence: int | None,
+):
+    task = Task.get_by_id(id)
+    if name:
+        task.name = name
+    if notes:
+        task.notes = notes
+    if name or notes:
+        task.save()
+    task_tags = set()
+    task_tags.add(("parent", str(parent_id))) if parent_id else None
+    task_tags.add(("order", str(order))) if order else None
+    task_tags.add(("scheduled", str(scheduled))) if scheduled else None
+    task_tags.add(("recurrence", str(recurrence))) if recurrence else None
+    untag_task(task, {(namespace, "*") for namespace, _ in task_tags})
+    tag_task(task, task_tags)
+    return task
