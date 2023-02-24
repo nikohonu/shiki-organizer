@@ -5,8 +5,6 @@ import click
 from rich.console import Console
 
 import shiki_organizer.models.task as so_task
-from shiki_organizer.cli.formatting import get_intervals
-from shiki_organizer.cli.table import create_intervals_table
 
 console = Console()
 

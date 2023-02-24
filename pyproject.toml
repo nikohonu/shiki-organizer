@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "shiki-organizer"
-version = "v10"
+version = "v11"
 description = "A program that aims to organize the user's life. Currently, it includes a to-do list and a time tracker."
 authors = ["Niko Honu <nikohonu@gmail.com>"]
 license = "MIT"
@@ -21,6 +21,7 @@ click-aliases = "^1.0.1"
 black = "^22.10.0"
 isort = "^5.10.1"
 pynvim = "^0.4.3"
+mypy = "^1.0.1"
 
 [build-system]
 requires = ["poetry-core"]

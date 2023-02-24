@@ -1,5 +1,4 @@
 import datetime as dt
-from typing import List, Set, Tuple
 
 import pendulum
 
@@ -12,14 +11,12 @@ from shiki_organizer.models.database import (
     Task,
     TaskTag,
 )
-
-
-def str_tag_to_tuple(tag):
-    if tag.find(":") != -1:
-        tag = tuple(tag.split(":", 1))
-    else:
-        tag = ("", tag)
-    return tag
+from shiki_organizer.models.tag import (
+    get_or_create_tag_from_string,
+    get_or_create_tag_from_tuple,
+    get_tags_from_strings,
+    get_tags_from_tuples,
+)
 
 
 def _str_to_types(string: str):
@@ -39,8 +36,21 @@ def _str_to_types(string: str):
         return string
 
 
-def get_task_ids():
+def get_task_ids() -> list[int]:
     return [task.id for task in Task.select()]
+
+
+def tag_task(task, tags: list[Tag]) -> None:
+    for tag in tags:
+        TaskTag.get_or_create(task=task, tag=tag)
+
+
+def tag_task_by_tuples(task, tags: list[tuple[str, str]]) -> None:
+    tag_task(task, [get_or_create_tag_from_tuple(tag) for tag in tags])
+
+
+def tag_task_by_strings(task, tags: list[str]) -> None:
+    tag_task(task, [get_or_create_tag_from_string(tag) for tag in tags])
 
 
 def add_task(
@@ -50,42 +60,32 @@ def add_task(
     order: int | None,
     scheduled: dt.date | None,
     recurrence: int | None,
-    want: int | None,
-    tags: List[str],
+    want: dt.timedelta | None,
 ):
-    task = Task.create(name=name, notes=notes)
-    task_tags = {str_tag_to_tuple(tag) for tag in tags}
-    task_tags.add(("parent", str(parent_id))) if parent_id else None
-    task_tags.add(("order", str(order))) if order else None
-    task_tags.add(("scheduled", str(scheduled))) if scheduled else None
-    task_tags.add(("recurrence", str(recurrence))) if recurrence else None
-    task_tags.add(("want", str(want))) if recurrence else None
-    tag_task(task, task_tags)
+    parent = Task.get_by_id(parent_id) if parent_id else None
+    task = Task.create(name=name, notes=notes, parent=parent)
+    task_tags: list[tuple[str, str]] = []
+    task_tags.append(("order", str(order))) if order else None
+    task_tags.append(("scheduled", str(scheduled))) if scheduled else None
+    task_tags.append(("recurrence", str(recurrence))) if recurrence else None
+    task_tags.append(("want", str(want.seconds))) if want else None
+    tag_task_by_tuples(task, task_tags)
     return task
 
 
-def tag_task(task, tags: Set[tuple]):
-    for namespace, subtag in tags:
-        namespace, _ = Namespace.get_or_create(name=namespace)
-        subtag, _ = Subtag.get_or_create(name=subtag)
-        tag, _ = Tag.get_or_create(namespace=namespace, subtag=subtag)
-        TaskTag.create(task=task, tag=tag)
+def untag_task(task, tags: list[Tag]):
+    query = TaskTag.delete().where((TaskTag.task == task) & (TaskTag.tag.in_(tags)))
+    query.execute()
 
 
-def untag_task(task, tags: Set[tuple]):
-    for namespace, subtag in tags:
-        namespace, _ = Namespace.get_or_create(name=namespace)
-        if subtag == "*":
-            target_tags = Tag.select().where(Tag.namespace == namespace)
-        else:
-            subtag, _ = Subtag.get_or_create(name=subtag)
-            target_tags = Tag.select().where(
-                Tag.namespace == namespace, Tag.subtag == subtag
-            )
-        query = TaskTag.delete().where(
-            (TaskTag.task == task) & (TaskTag.tag.in_(target_tags))
-        )
-        query.execute()
+def untag_task_by_tuples(task, tuple_tags: list[tuple[str, str]]):
+    tags = get_tags_from_tuples(tuple_tags)
+    untag_task(task, tags)
+
+
+def untag_task_by_strings(task, string_tags: list[str]):
+    tags = get_tags_from_strings(string_tags)
+    untag_task(task, tags)
 
 
 def modify_task(
@@ -96,27 +96,29 @@ def modify_task(
     order: int | None,
     scheduled: dt.date | None,
     recurrence: int | None,
-    want: int | None,
+    want: dt.timedelta | None,
 ):
+    parent = Task.get_by_id(parent_id) if parent_id else None
     task = Task.get_by_id(id)
     if name:
         task.name = name
     if notes:
         task.notes = notes
+    if parent:
+        task.parent = parent
     if name or notes:
         task.save()
-    task_tags = set()
-    task_tags.add(("parent", str(parent_id))) if parent_id else None
-    task_tags.add(("order", str(order))) if order else None
-    task_tags.add(("scheduled", str(scheduled))) if scheduled else None
-    task_tags.add(("recurrence", str(recurrence))) if recurrence else None
-    task_tags.add(("want", str(want))) if want else None
-    untag_task(task, {(namespace, "*") for namespace, _ in task_tags})
-    tag_task(task, task_tags)
+    task_tags: list[tuple[str, str]] = []
+    task_tags.append(("order", str(order))) if order else None
+    task_tags.append(("scheduled", str(scheduled))) if scheduled else None
+    task_tags.append(("recurrence", str(recurrence))) if recurrence else None
+    task_tags.append(("want", str(want.seconds))) if want else None
+    untag_task_by_tuples(task, [(namespace, "*") for namespace, _ in task_tags])
+    tag_task_by_tuples(task, task_tags)
     return task
 
 
-def delete_task(ids: List[int]):
+def delete_task(ids: set[int]):
     result = []
     tasks = Task.select().where(Task.id.in_(ids))
     for task in tasks:
@@ -127,7 +129,7 @@ def delete_task(ids: List[int]):
     return result
 
 
-def _period_to_datetime(period: str, min_start):
+def _period_to_datetime(period: str) -> dt.datetime:
     start = pendulum.now()
     match period.lower():
         case "day":
@@ -139,72 +141,87 @@ def _period_to_datetime(period: str, min_start):
         case "year":
             start = start.start_of("year")
         case _:
-            start = min_start
-    if start != min_start:
-        start_string = start.to_datetime_string()
-        start = dt.datetime.fromisoformat(start_string)
+            interval = Interval.select(Interval.start).order_by(Interval.start).first()
+            if interval:
+                start = interval.start
+            else:
+                start = start.start_of("day")
+            start = pendulum.datetime(year=start.year, month=start.month, day=start.day)
+    start = dt.datetime(year=start.year, month=start.month, day=start.day)
     return start
 
 
 def _calc_duration(tasks, period, individual_average):
-    local_tasks = {
-        task["id"]: {
-            "parent": next(iter(task["tags"]["parent"]))
-            if "parent" in task["tags"]
-            else None,
-            "duration": 0,
-            "days": set(),
-        }
-        for task in tasks
-    }
-    start = dt.datetime.max
-    intervals = Interval.select()
-    for interval in intervals:
-        if interval.start < start:
-            start = interval.start
-    start = _period_to_datetime(period, start)
-    intervals = intervals.where(Interval.start >= start)
+    start = _period_to_datetime(period)
+    intervals = Interval.select().where(Interval.start >= start)
     for interval in intervals:
         result = []
-        queue = [local_tasks[interval.task_id]]
+        queue = [tasks[interval.task_id]]
         while queue:
             task = queue.pop()
             result.append(task)
-            if task["parent"]:
-                queue.append(local_tasks[task["parent"]])
+            if task["parent"] != None:
+                queue.append(tasks[task["parent"]])
         for task in result:
             task["duration"] += interval.duration
             task["days"].add(interval.start.date())
-    for task in local_tasks.values():
+    for id, task in tasks.items():
         if task["days"]:
             if not individual_average:
-                task["days"] = (dt.datetime.now() - start).days + 1
+                task["days"] = (dt.datetime.now().date() - start.date()).days + 1
             else:
                 task["days"] = len(task["days"])
             task["average"] = round(task["duration"] / task["days"])
-    for task in tasks:
-        duration = local_tasks[task["id"]]["duration"]
-        if duration:
-            days = local_tasks[task["id"]]["days"]
-            average = local_tasks[task["id"]]["average"]
-            task["tags"]["duration"] = [duration]
-            task["tags"]["average"] = [average]
-            if individual_average:
-                task["tags"]["days"] = [days]
-            if "want" in task["tags"]:
-                need = next(iter(task["tags"]["want"])) - average
-                task["tags"]["need"] = [need]
+        else:
+            task["days"] = None
+        if not individual_average and id:
+            task["days"] = None
+        if task["want"]:
+            if task["average"]:
+                task["need"] = task["want"] - task["average"]
+            else:
+                task["need"] = task["want"]
+    return tasks
 
 
-def get_tasks(
-    duration=False,
-    period="all",
-    individual_average=False,
-    completed=False,
-    sorting="duration",
-    reverse=False,
-):
-    tasks = Task.select().dicts()
+def _check_task(task, query: list[tuple[str, str, str]]):
+    for key, operator, value in query:
+        if key in task:
+            if operator == "<=":
+                if not task[key]:
+                    return False
+                if task[key] > value:
+                    return False
+    return True
+
+
+def _get_tasks(include_zero=False, ids=None):
+    tasks_query = Task.select()
+    if ids:
+        tasks_query = tasks_query.where(Task.id.in_(ids))
+    tasks = {
+        task.id: {
+            "name": task.name,
+            "parent": task.parent.id if task.parent else 0,
+        }
+        for task in tasks_query
+    }
+    if include_zero:
+        tasks[0] = {"name": "Tasks", "parent": None}
+    for task in tasks.values():
+        task.update(
+            {
+                "duration": 0,
+                "average": None,
+                "days": set(),
+                "want": None,
+                "need": None,
+                "scheduled": None,
+                "recurrence": None,
+                "status": None,
+                "tags": {},
+            }
+        )
     task_tags = (
         TaskTag.select(
             TaskTag.task,
@@ -215,38 +232,98 @@ def get_tasks(
         .join(Tag)
         .join_from(Tag, Namespace)
         .join_from(Tag, Subtag)
-    ).dicts()
-    for task in tasks:
-        local_task_tags = [
-            task_tag for task_tag in task_tags if task_tag["task"] == task["id"]
-        ]
-        task["tags"] = {}
-        for tag in local_task_tags:
-            if tag["namespace"] not in task["tags"]:
-                task["tags"][tag["namespace"]] = [_str_to_types(tag["subtag"])]
-            else:
-                task["tags"][tag["namespace"]].append(_str_to_types(tag["subtag"]))
-        task["tags"] = dict(sorted(task["tags"].items()))
-    if duration:
-        _calc_duration(tasks, period, individual_average)
-        if not completed:
-            tasks = list(
-                filter(
-                    lambda t: next(iter(t["tags"]["status"])) != "completed"
-                    if "status" in t["tags"]
-                    else True,
-                    tasks,
+    )
+    if ids:
+        task_tags = task_tags.where(TaskTag.task.in_(tasks_query))
+    for task_tag in task_tags.dicts():
+        task = tasks[task_tag["task"]]
+        if task_tag["namespace"] in task:
+            task[task_tag["namespace"]] = _str_to_types(task_tag["subtag"])
+        else:
+            if task_tag["namespace"] in task["tags"]:
+                task["tags"][task_tag["namespace"]].append(
+                    _str_to_types(task_tag["subtag"])
                 )
-            )
-        min_key = dt.date.min if sorting in ["scheduled"] else 0
-        tasks = sorted(
-            tasks,
-            key=lambda t: next(iter(t["tags"][sorting]))
-            if sorting in t["tags"]
-            else min_key,
-            reverse=reverse,
-        )
+            else:
+                task["tags"][task_tag["namespace"]] = [
+                    _str_to_types(task_tag["subtag"])
+                ]
     return tasks
+
+
+def get_task(id: int):
+    tasks = _get_tasks(True)
+    _calc_duration(tasks, "day", True)
+    return tasks[id]
+
+
+def get_tasks(
+    search_query: list[tuple[str, str, str]],
+    period="all",
+    individual_average=False,
+    sorting="duration",
+    completed=False,
+    reverse=False,
+):
+    all_tasks = _get_tasks(True)
+    _calc_duration(all_tasks, period, individual_average)
+    if not completed:
+        all_tasks = dict(
+            filter(lambda item: item[1]["status"] != "completed", all_tasks.items())
+        )
+    filtred_tasks = {}
+    if not search_query:
+        filtred_tasks = all_tasks
+    else:
+        for id, task in all_tasks.items():
+            if _check_task(task, search_query):
+                filtred_tasks[id] = task
+    tasks = {}
+    query = list(filtred_tasks.items())
+    if filtred_tasks != all_tasks:
+        while query:
+            current_id, current_task = query.pop()
+            tasks[current_id] = current_task
+            if current_task["parent"] != None:
+                query.append(
+                    (current_task["parent"], all_tasks[current_task["parent"]])
+                )
+    else:
+        tasks = all_tasks
+    min_key = dt.date.min if sorting in ["scheduled"] else 0
+    tasks = dict(
+        sorted(
+            tasks.items(),
+            key=lambda item: item[1][sorting] if item[1][sorting] != None else min_key,
+            reverse=not reverse,
+        )
+    )
+    return tasks
+
+
+def done_tasks(ids: list[int]):
+    results = []
+    stop_task()
+    tasks = _get_tasks(False, ids)
+    for id, task in tasks.items():
+        if task["status"] == "completed":
+            results.append((id, task["name"], "ignored"))
+            continue
+        if task["recurrence"]:
+            task["scheduled"] = (
+                dt.datetime.now() + dt.timedelta(days=task["recurrence"])
+            ).date()
+            results.append((id, task["name"], "rescheduled"))
+        else:
+            task["status"] = "completed"
+            results.append((id, task["name"], "done"))
+        tags = []
+        tags.append(("scheduled", task["scheduled"])) if task["scheduled"] else None
+        tags.append(("status", task["status"])) if task["status"] else None
+        task = Task.get_by_id(id)
+        untag_task_by_tuples(task, [("scheduled", "*"), ("status", "*")])
+        tag_task_by_tuples(task, tags)
+    return results
 
 
 def get_current_interval():
@@ -277,3 +354,11 @@ def stop_task():
 
 def get_task_by_id(id):
     return Task.get_by_id(id)
+
+
+def str_tag_to_tuple(tag: str) -> tuple[str, str]:
+    if tag.find(":") != -1:
+        namespace, subtag = tuple(tag.split(":", 1))
+    else:
+        namespace, subtag = "", tag
+    return namespace, subtag

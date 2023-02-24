@@ -51,6 +51,7 @@ class Tag(BaseModel):
 class Task(BaseModel):
     id = AutoField()
     name = TextField()
+    parent = ForeignKeyField("self", backref="children", null=True)
     notes = TextField(null=True)
 
 

@@ -4,12 +4,14 @@ import datetime as dt
 import click
 from click_aliases import ClickAliasedGroup
 
-from shiki_organizer.cli.formatting import duration_to_str, get_table, get_tree
+from shiki_organizer.cli.formatting import duration_to_str, get_tree
 from shiki_organizer.formatting import console
 from shiki_organizer.models.task import (
     add_task,
     delete_task,
+    done_tasks,
     get_current_interval,
+    get_task,
     get_task_by_id,
     get_task_ids,
     get_tasks,
@@ -18,7 +20,9 @@ from shiki_organizer.models.task import (
     stop_task,
     str_tag_to_tuple,
     tag_task,
+    tag_task_by_strings,
     untag_task,
+    untag_task_by_strings,
 )
 
 
@@ -28,7 +32,7 @@ def task():
 
 
 @task.command()
-@click.argument("name", nargs=-1)
+@click.argument("name")
 @click.option(
     "-n", "--notes", type=str, help="Any additional information about the task."
 )
@@ -65,25 +69,12 @@ def task():
     type=click.IntRange(1),
     help="How much time on average you want to spend on this task (in minutes).",
 )
-@click.option(
-    "-t",
-    "--tag",
-    "tags",
-    type=str,
-    multiple=True,
-    help='Tags for the task. For example, "type:media" or just "media". You '
-    'can also specify multiple tags with "-t tag1 -t tag2"',
-)
-def add(name, notes, parent_id, order, scheduled, recurrence, want, tags):
+def add(name, notes, parent_id, order, scheduled, recurrence, want):
     """Add a task with a NAME."""
-    if len(name) == 0:
-        console.print("Error: Missing argument 'NAME'.")
-        return
-    name = " ".join(name)
     scheduled = scheduled.date() if scheduled else None
-    want *= 60
-    task = add_task(name, notes, parent_id, order, scheduled, recurrence, want, tags)
-    console.print(f'"{task.id} {task.name}" was created.')
+    want = dt.timedelta(minutes=want) if want else None
+    task = add_task(name, notes, parent_id, order, scheduled, recurrence, want)
+    console.print(task.id, f'"{task.name}" was created.')
 
 
 @task.command(aliases=["modify", "mod"])
@@ -130,11 +121,21 @@ def modify(id, name, notes, parent_id, order, scheduled, recurrence, want):
     remove properties, use the untag command instead. For example, "so task
     untag ID scheldued:*" """
     scheduled = scheduled.date() if scheduled else None
-    want *= 60
+    want = dt.timedelta(minutes=want) if want else None
     task = modify_task(
         int(id), name, notes, parent_id, order, scheduled, recurrence, want
     )
-    console.print(f'"{task.id} {task.name}" was modified.')
+    console.print(task.id, f'"{task.name}" was modified.')
+
+
+@task.command()
+@click.argument("ids", type=click.Choice([str(id) for id in get_task_ids()]), nargs=-1)
+def done(ids):
+    """Stop task tracking and complete or reschedule the task with IDS."""
+    get_current_task_status()
+    results = done_tasks(ids)
+    for id, name, result in results:
+        console.log(id, f'"{name}" was {result}.')
 
 
 @task.command(aliases=["delete", "del"])
@@ -143,63 +144,15 @@ def delete(ids):
     """Delete tasks with IDS."""
     tasks = delete_task(ids)
     for task in tasks:
-        console.print(f'"{task["id"]} {task["name"]}" was deleted.')
+        console.print(task["id"], f'{task["name"]}" was deleted.')
 
 
 @task.command()
-@click.argument("ids", type=click.Choice([str(id) for id in get_task_ids()]), nargs=-1)
-def show():
-    pass
-
-
-@task.command()
-@click.option(
-    "-p",
-    "--period",
-    type=click.Choice(["all", "day", "week", "month", "year"]),
-    default="all",
-    help="The period for calculating the duration and average duration of tasks.",
-)
-@click.option(
-    "-i",
-    "--individual",
-    is_flag=True,
-    help="Use an individual average for the task, i.e., divide the duration by"
-    "the days on which you track the task",
-)
-@click.option(
-    "-c",
-    "--completed",
-    is_flag=True,
-    help="Show completed tasks.",
-)
-@click.option(
-    "-s",
-    "--sorting",
-    default="duration",
-    type=click.Choice(
-        [
-            "want",
-            "need",
-            "duration",
-            "average",
-            "scheduled",
-            "days",
-            "recurrence",
-        ]
-    ),
-    help="Sort by the field.",
-)
-@click.option(
-    "-r",
-    "--reverse",
-    is_flag=True,
-    help="Reverse sorting.",
-)
-def tree(period, individual, completed, sorting, reverse):
-    tasks = get_tasks(True, period, individual, completed, sorting, reverse)
-    tree = get_tree(tasks)
-    console.print(tree)
+@click.argument("id", type=click.Choice([str(id) for id in get_task_ids()]))
+def show(id):
+    """Show information about a task with an ID."""
+    task = get_task(int(id))
+    console.print(task)
 
 
 @task.command()
@@ -249,25 +202,16 @@ def tree(period, individual, completed, sorting, reverse):
 @click.option(
     "-n",
     "--next",
-    "next_tasks",
     is_flag=True,
     help="Show tasks that are scheduled to start today or earlier.",
 )
-def table(period, individual, completed, sorting, reverse, next_tasks):
-    tasks = get_tasks(True, period, individual, completed, sorting, reverse)
-    tasks = (
-        list(
-            filter(
-                lambda t: next(iter(t["tags"]["scheduled"])) <= dt.date.today()
-                if "scheduled" in t["tags"]
-                else False,
-                tasks,
-            )
-        )
-        if next_tasks
-        else tasks
-    )
-    tree = get_table(tasks)
+def tree(period, individual, completed, sorting, reverse, next):
+    """Show the task tree."""
+    query = []
+    if next:
+        query.append(("scheduled", "<=", dt.date.today()))
+    tasks = get_tasks(query, period, individual, sorting, completed, reverse)
+    tree = get_tree(0, tasks)
     console.print(tree)
 
 
@@ -282,6 +226,8 @@ def get_current_task_status():
         duration = duration_to_str(interval.duration)
         result += f" duration is {duration if duration else '0s'}."
         console.print(result)
+    else:
+        console.print("You don't have a current task.")
 
 
 @task.command()
@@ -300,78 +246,35 @@ def get_current_task_status():
     help="End of the interval",
 )
 def start(id, start, end):
+    """Start task tracking with ID."""
     start_task(int(id), start, end)
     get_current_task_status()
 
 
 @task.command()
 def stop():
+    """Stop task tracking.."""
     get_current_task_status()
     stop_task()
 
 
 @task.command()
 @click.argument("id", type=click.Choice([str(id) for id in get_task_ids()]))
-@click.argument("raw_tags", type=str, nargs=-1)
-def tag(id, raw_tags):
-    tags = set()
-    for raw_tag in raw_tags:
-        tags.add(str_tag_to_tuple(raw_tag))
-    tag_task(get_task_by_id(id), tags)
+@click.argument("tags", type=str, nargs=-1)
+def tag(id, tags):
+    """Add tags to the task."""
+    tag_task_by_strings(get_task_by_id(id), tags)
 
 
 @task.command()
 @click.argument("id", type=click.Choice([str(id) for id in get_task_ids()]))
-@click.argument("raw_tags", type=str, nargs=-1)
-def untag(id, raw_tags):
-    tags = set()
-    for raw_tag in raw_tags:
-        tags.add(str_tag_to_tuple(raw_tag))
-    untag_task(get_task_by_id(id), tags)
-
-
-@task.command()
-@click.argument("ids", type=click.Choice([str(id) for id in get_task_ids()]), nargs=-1)
-def done(ids):
-    get_current_task_status()
-    stop_task()
-    tasks = get_tasks(True)
-    tasks = list(filter(lambda t: str(t["id"]) in ids, tasks))
-    for task in tasks:
-        status = (
-            next(iter(task["tags"]["status"])) if "status" in task["tags"] else None
-        )
-        if status == "completed":
-            return
-        recurrence = (
-            next(iter(task["tags"]["recurrence"]))
-            if "recurrence" in task["tags"]
-            else None
-        )
-        scheduled = (
-            next(iter(task["tags"]["scheduled"]))
-            if "scheduled" in task["tags"]
-            else None
-        )
-        deadline = (
-            next(iter(task["tags"]["deadline"])) if "deadline" in task["tags"] else None
-        )
-        if recurrence:
-            scheduled = (dt.datetime.now() + dt.timedelta(days=recurrence)).date()
-            if deadline and scheduled > deadline:
-                status = "completed"
-                scheduled = dt.date.today()
-        else:
-            status = "completed"
-        tags = set()
-        task = get_task_by_id(task["id"])
-        untag_task(task, {("scheduled", "*"), ("deadline", "*"), ("status", "*")})
-        tags.add(("scheduled", scheduled)) if scheduled else None
-        tags.add(("deadline", deadline)) if deadline else None
-        tags.add(("status", status)) if status else None
-        tag_task(task, tags)
+@click.argument("tags", type=str, nargs=-1)
+def untag(id, tags):
+    """Remove tags from the task."""
+    untag_task_by_strings(get_task_by_id(id), tags)
 
 
 @task.command()
 def status():
+    """Show information about the current task."""
     get_current_task_status()
