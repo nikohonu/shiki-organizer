@@ -135,7 +135,7 @@ def done(ids):
     get_current_task_status()
     results = done_tasks(ids)
     for id, name, result in results:
-        console.log(id, f'"{name}" was {result}.')
+        console.print(id, f'"{name}" was {result}.')
 
 
 @task.command(aliases=["delete", "del"])

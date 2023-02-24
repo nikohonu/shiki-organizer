@@ -1,7 +1,4 @@
-from rich.table import Table
 from rich.tree import Tree
-
-from shiki_organizer.models.database import Interval
 
 colors = ["red", "green", "yellow", "blue", "magenta", "cyan"]
 colors_map = {}
@@ -9,7 +6,11 @@ color_index = 0
 
 
 def duration_to_str(duration):
-    result = ""
+    if duration <= 0:
+        result = "-"
+        duration = -duration
+    else:
+        result = ""
     seconds = duration
     minutes = int(duration / 60)
     hours = int(minutes / 60)
